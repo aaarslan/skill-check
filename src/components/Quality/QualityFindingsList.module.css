@@ -1,0 +1,63 @@
+.empty {
+  color: var(--color-muted);
+  font-size: 0.9rem;
+  padding: var(--space-3);
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-height: 24rem;
+  overflow-y: auto;
+}
+
+.item {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3);
+}
+
+.itemHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-1);
+}
+
+.category {
+  font-size: 0.75rem;
+  color: var(--color-muted);
+}
+
+.line {
+  font-size: 0.75rem;
+  color: var(--color-muted);
+  margin-left: auto;
+  font-family: var(--font-mono);
+}
+
+.message {
+  font-weight: 600;
+  margin: var(--space-1) 0;
+}
+
+.explanation {
+  color: var(--color-muted);
+  font-size: 0.88rem;
+  margin: var(--space-1) 0;
+}
+
+.suggestion {
+  font-size: 0.88rem;
+  margin: var(--space-1) 0;
+}
+
+.ruleId {
+  font-size: 0.75rem;
+  color: var(--color-muted);
+  margin: var(--space-1) 0 0;
+}

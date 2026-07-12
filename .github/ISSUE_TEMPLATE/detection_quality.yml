@@ -1,0 +1,29 @@
+name: Detection quality (false positive or false negative)
+description: A quality score or injection finding that is wrong or misleading.
+labels: [detection]
+body:
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Kind
+      options:
+        - False positive (flagged something benign)
+        - False negative (missed something it should catch)
+        - Score seems wrong
+    validations:
+      required: true
+  - type: textarea
+    id: sample
+    attributes:
+      label: Minimal sample
+      description: The smallest Markdown snippet that shows the problem.
+      render: markdown
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected versus actual
+      description: What finding or score did you expect, and what did you get?
+    validations:
+      required: true

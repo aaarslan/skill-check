@@ -1,0 +1,51 @@
+.gauge,
+.compact {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  border: 3px solid transparent;
+}
+
+.gauge {
+  width: 5rem;
+  height: 5rem;
+}
+
+.compact {
+  width: 3rem;
+  height: 3rem;
+}
+
+.gauge[data-band="good"],
+.compact[data-band="good"] {
+  border-color: var(--color-added-text);
+}
+
+.gauge[data-band="fair"],
+.compact[data-band="fair"] {
+  border-color: var(--color-warning);
+}
+
+.gauge[data-band="poor"],
+.compact[data-band="poor"] {
+  border-color: var(--color-danger);
+}
+
+.score {
+  font-weight: 700;
+  font-size: 1.4rem;
+  line-height: 1;
+}
+
+.compact .score {
+  font-size: 1rem;
+}
+
+.label {
+  font-size: 0.65rem;
+  color: var(--color-muted);
+  text-align: center;
+  margin-top: 2px;
+}

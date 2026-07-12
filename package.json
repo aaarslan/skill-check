@@ -1,0 +1,56 @@
+{
+  "name": "skill-check",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Compare two LLM skill Markdown files locally: diff, deterministic quality scoring, and heuristic prompt-injection detection. Runs entirely in the browser.",
+  "keywords": [
+    "diff",
+    "llm",
+    "markdown",
+    "prompt-injection",
+    "quality",
+    "react",
+    "security"
+  ],
+  "homepage": "https://github.com/aaarslan/skill-check#readme",
+  "bugs": {
+    "url": "https://github.com/aaarslan/skill-check/issues"
+  },
+  "license": "MIT",
+  "author": "Arslan Abdallah <arslan.abdallah@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/aaarslan/skill-check.git"
+  },
+  "type": "module",
+  "scripts": {
+    "dev": "vp dev",
+    "build": "tsc && vp build",
+    "preview": "vp preview",
+    "check": "vp check",
+    "test": "vp test",
+    "prepare": "vp config"
+  },
+  "dependencies": {
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.3",
+    "jsdom": "^29.1.1",
+    "typescript": "~6.0.2",
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
+  },
+  "devEngines": {
+    "packageManager": {
+      "name": "pnpm",
+      "version": "11.11.0",
+      "onFail": "download"
+    }
+  }
+}

@@ -1,0 +1,77 @@
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+}
+
+.table thead {
+  position: sticky;
+  top: 0;
+  background: var(--color-surface);
+}
+
+.table th {
+  text-align: left;
+  padding: var(--space-1) var(--space-2);
+  color: var(--color-muted);
+  font-weight: 500;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.lineNumber {
+  width: 3.5em;
+  padding: 1px var(--space-2);
+  text-align: right;
+  color: var(--color-muted);
+  user-select: none;
+  vertical-align: top;
+  white-space: nowrap;
+}
+
+.code {
+  padding: 1px var(--space-2);
+  white-space: pre-wrap;
+  word-break: break-word;
+  vertical-align: top;
+}
+
+.unchanged {
+  padding: 1px var(--space-2);
+  white-space: pre-wrap;
+  word-break: break-word;
+  vertical-align: top;
+}
+
+.added {
+  padding: 1px var(--space-2);
+  white-space: pre-wrap;
+  word-break: break-word;
+  vertical-align: top;
+  background: var(--color-added-bg);
+  color: var(--color-added-text);
+}
+
+.removed {
+  padding: 1px var(--space-2);
+  white-space: pre-wrap;
+  word-break: break-word;
+  vertical-align: top;
+  background: var(--color-removed-bg);
+  color: var(--color-removed-text);
+}
+
+.blank {
+  padding: 1px var(--space-2);
+  background: color-mix(in srgb, var(--color-border) 30%, transparent);
+}
+
+.added code::before {
+  content: "+ ";
+  opacity: 0.6;
+}
+
+.removed code::before {
+  content: "- ";
+  opacity: 0.6;
+}

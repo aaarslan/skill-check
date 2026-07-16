@@ -1,5 +1,10 @@
 import type { AnalyzableDocument } from "../../shared/markdown.ts";
-import { parseHeadings, parseParagraphs } from "../../shared/markdown.ts";
+import {
+  codeBlockLineSet,
+  parseHeadings,
+  parseParagraphs,
+  stripInlineCode,
+} from "../../shared/markdown.ts";
 import type { QualityFinding, QualityRule } from "../types.ts";
 
 const FRONTMATTER_PATTERN = /^---\s*$/u;
@@ -85,7 +90,12 @@ const hasTriggerGuidance: QualityRule = {
   category: "purpose",
   description: "Checks for guidance on when the skill should be triggered or loaded.",
   evaluate(doc: AnalyzableDocument): QualityFinding[] {
-    const matched = TRIGGER_PATTERNS.some((pattern) => pattern.test(doc.content));
+    const codeLines = codeBlockLineSet(doc);
+    const prose = doc.lines
+      .filter((_line, index) => !codeLines.has(index + 1))
+      .map(stripInlineCode)
+      .join("\n");
+    const matched = TRIGGER_PATTERNS.some((pattern) => pattern.test(prose));
     if (matched) {
       return [];
     }

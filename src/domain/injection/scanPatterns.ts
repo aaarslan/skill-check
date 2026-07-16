@@ -49,8 +49,15 @@ export function scanPatterns(
       for (const match of line.matchAll(globalPattern)) {
         matchedRaw = true;
         const matchedText = match[0];
-        const quoted = isLikelyQuotedContext(doc, lineNumber, codeLines, matchedText);
-        const descriptive = isDescriptiveFraming(line, match.index ?? 0);
+        const matchIndex = match.index ?? 0;
+        const quoted = isLikelyQuotedContext(
+          doc,
+          lineNumber,
+          codeLines,
+          matchIndex,
+          matchedText.length,
+        );
+        const descriptive = isDescriptiveFraming(line, matchIndex);
         const suspicion = downgradeIfDescriptive(
           downgradeIfQuoted(baseSuspicion, quoted),
           descriptive,
@@ -77,15 +84,26 @@ export function scanPatterns(
       if (!normalizedMatch) {
         continue;
       }
+      const quoted = isLikelyQuotedContext(
+        doc,
+        lineNumber,
+        codeLines,
+        normalizedMatch.index,
+        normalizedMatch[0].length,
+      );
+      const descriptive = isDescriptiveFraming(normalizedLine, normalizedMatch.index);
       findings.push({
         id: `${ruleId}:${lineNumber}:obfuscated:${normalizedMatch.index}`,
         ruleId,
         category,
-        suspicion: upgradeSuspicionTier(baseSuspicion),
+        suspicion: downgradeIfDescriptive(
+          downgradeIfQuoted(upgradeSuspicionTier(baseSuspicion), quoted),
+          descriptive,
+        ),
         matchedText: line.trim(),
         location: { line: lineNumber, excerpt: line.trim().slice(0, 100) },
         rationale: `${spec.rationale} (only matched after normalizing lookalike characters or separators — likely obfuscated)`,
-        isQuotedExample: false,
+        isQuotedExample: quoted,
       });
     }
   });
@@ -100,6 +118,7 @@ interface CrossLineCandidate {
   readonly windowSize: number;
   readonly matchedText: string;
   readonly joined: string;
+  readonly matchIndex: number;
 }
 
 /**
@@ -116,6 +135,7 @@ export function scanCrossLinePatterns(
   patterns: readonly PatternSpec[],
 ): InjectionFinding[] {
   const findings: InjectionFinding[] = [];
+  const codeLines = codeBlockLineSet(doc);
 
   for (const spec of patterns) {
     const candidates: CrossLineCandidate[] = [];
@@ -123,6 +143,9 @@ export function scanCrossLinePatterns(
     for (const windowSize of CROSS_LINE_WINDOW_SIZES) {
       for (let start = 0; start + windowSize <= doc.lines.length; start++) {
         const windowLines = doc.lines.slice(start, start + windowSize);
+        if (windowLines.some((_line, index) => codeLines.has(start + index + 1))) {
+          continue;
+        }
         const nonEmptyCount = windowLines.filter((line) => line.trim().length > 0).length;
         if (nonEmptyCount < 2) {
           continue;
@@ -134,12 +157,22 @@ export function scanCrossLinePatterns(
         if (windowLines.some((line) => singleLinePattern.test(line))) {
           continue;
         }
-        const joined = windowLines.join(" ").replace(/\s+/gu, " ").trim();
+        const joined = windowLines
+          .map((line) => line.replace(/^\s*>\s?/u, ""))
+          .join(" ")
+          .replace(/\s+/gu, " ")
+          .trim();
         const match = toGlobal(spec.pattern).exec(joined);
         if (!match) {
           continue;
         }
-        candidates.push({ start, windowSize, matchedText: match[0], joined });
+        candidates.push({
+          start,
+          windowSize,
+          matchedText: match[0],
+          joined,
+          matchIndex: match.index,
+        });
       }
     }
 
@@ -161,15 +194,18 @@ export function scanCrossLinePatterns(
 
     for (const candidate of kept) {
       const lineNumber = candidate.start + 1;
+      const baseSuspicion = spec.suspicion ?? defaultSuspicion;
+      const quoted = isLikelyQuotedContext(doc, lineNumber, codeLines, 0, 0);
+      const descriptive = isDescriptiveFraming(candidate.joined, candidate.matchIndex);
       findings.push({
         id: `${ruleId}:${lineNumber}:cross-line-${candidate.windowSize}`,
         ruleId,
         category,
-        suspicion: spec.suspicion ?? defaultSuspicion,
+        suspicion: downgradeIfDescriptive(downgradeIfQuoted(baseSuspicion, quoted), descriptive),
         matchedText: candidate.matchedText,
         location: { line: lineNumber, excerpt: candidate.joined.slice(0, 100) },
         rationale: `${spec.rationale} (only matched when lines ${lineNumber}-${candidate.start + candidate.windowSize} are joined — possibly split across lines to evade detection)`,
-        isQuotedExample: false,
+        isQuotedExample: quoted,
       });
     }
   }

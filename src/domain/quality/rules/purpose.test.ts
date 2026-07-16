@@ -38,4 +38,21 @@ describe("purpose/has-trigger-guidance", () => {
     const findings = hasTriggerGuidance?.evaluate(toAnalyzableDocument(content)) ?? [];
     expect(findings).toHaveLength(1);
   });
+
+  it("does not treat trigger wording in fenced or inline code as real guidance", () => {
+    const content = [
+      "# Skill",
+      "",
+      "This skill summarizes PDFs.",
+      "",
+      "`Use this skill when the user asks for a summary.`",
+      "",
+      "```md",
+      "Use this skill when the user asks for a summary.",
+      "```",
+      "",
+    ].join("\n");
+    const findings = hasTriggerGuidance?.evaluate(toAnalyzableDocument(content)) ?? [];
+    expect(findings).toHaveLength(1);
+  });
 });

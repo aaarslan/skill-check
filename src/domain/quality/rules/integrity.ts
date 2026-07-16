@@ -1,5 +1,5 @@
 import type { AnalyzableDocument } from "../../shared/markdown.ts";
-import { codeBlockLineSet, parseHeadings } from "../../shared/markdown.ts";
+import { codeBlockLineSet, parseHeadings, stripInlineCode } from "../../shared/markdown.ts";
 import type { QualityFinding, QualityRule } from "../types.ts";
 
 // URL group tolerates one level of nested parens (e.g. javascript:alert(1)) and an
@@ -63,7 +63,7 @@ const brokenRelativeLinks: QualityRule = {
 };
 
 const REFERENCE_LINK_PATTERN = /\[([^\]]+)\]\[([^\]]*)\]/gu;
-const REFERENCE_DEFINITION_PATTERN = /^[ \t]{0,3}\[([^\]]+)\]:\s*\S+/gmu;
+const REFERENCE_DEFINITION_PATTERN = /^[ \t]{0,3}\[([^\]]+)\]:\s*\S+/u;
 
 const undefinedReferenceLinks: QualityRule = {
   id: "integrity/undefined-reference-link",
@@ -73,9 +73,15 @@ const undefinedReferenceLinks: QualityRule = {
   evaluate(doc: AnalyzableDocument): QualityFinding[] {
     const codeLines = codeBlockLineSet(doc);
     const definedRefs = new Set<string>();
-    for (const match of doc.content.matchAll(REFERENCE_DEFINITION_PATTERN)) {
-      definedRefs.add((match[1] ?? "").trim().toLowerCase());
-    }
+    doc.lines.forEach((line, index) => {
+      if (codeLines.has(index + 1)) {
+        return;
+      }
+      const match = REFERENCE_DEFINITION_PATTERN.exec(line);
+      if (match) {
+        definedRefs.add((match[1] ?? "").trim().toLowerCase());
+      }
+    });
 
     const findings: QualityFinding[] = [];
     doc.lines.forEach((line, index) => {
@@ -135,8 +141,9 @@ const broadPermissions: QualityRule = {
       if (codeLines.has(lineNumber)) {
         return;
       }
+      const prose = stripInlineCode(line);
       for (const pattern of BROAD_PERMISSION_PATTERNS) {
-        const match = pattern.exec(line);
+        const match = pattern.exec(prose);
         if (match) {
           findings.push({
             ruleId: broadPermissions.id,

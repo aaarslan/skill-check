@@ -28,6 +28,10 @@ function lineNumberForOffset(content: string, offset: number): number {
   return line;
 }
 
+function columnForOffset(content: string, offset: number): number {
+  return offset - (content.lastIndexOf("\n", Math.max(0, offset - 1)) + 1);
+}
+
 function suspiciousUrlReason(url: string): string | null {
   if (NON_HTTP_SCHEME.test(url)) {
     return `uses a non-http "${url.split(":")[0]}:" scheme`;
@@ -58,7 +62,13 @@ export const hiddenContentRule: InjectionRule = {
       const lineNumber = lineNumberForOffset(doc.content, match.index ?? 0);
       const hasDirective = DIRECTIVE_CUE.test(commentBody);
       const suspicion: Suspicion = hasDirective ? "high" : "low";
-      const quoted = isLikelyQuotedContext(doc, lineNumber, codeLines, match[0]);
+      const quoted = isLikelyQuotedContext(
+        doc,
+        lineNumber,
+        codeLines,
+        columnForOffset(doc.content, match.index ?? 0),
+        match[0].length,
+      );
       findings.push({
         id: `${RULE_ID}:${lineNumber}:${match.index ?? 0}`,
         ruleId: RULE_ID,
@@ -98,7 +108,13 @@ export const hiddenContentRule: InjectionRule = {
         if (!reason) {
           continue;
         }
-        const quoted = isLikelyQuotedContext(doc, lineNumber, codeLines, match[0]);
+        const quoted = isLikelyQuotedContext(
+          doc,
+          lineNumber,
+          codeLines,
+          match.index ?? 0,
+          match[0].length,
+        );
         findings.push({
           id: `${RULE_ID}:${lineNumber}:${match.index ?? 0}`,
           ruleId: RULE_ID,

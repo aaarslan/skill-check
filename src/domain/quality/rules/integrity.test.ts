@@ -56,6 +56,19 @@ describe("integrity/undefined-reference-link", () => {
     const findings = undefinedReferenceLinks?.evaluate(toAnalyzableDocument(content)) ?? [];
     expect(findings).toHaveLength(0);
   });
+
+  it("does not treat a definition inside fenced code as a live reference definition", () => {
+    const content = [
+      "See [the docs][docs-ref] for details.",
+      "",
+      "```md",
+      "[docs-ref]: https://example.com",
+      "```",
+      "",
+    ].join("\n");
+    const findings = undefinedReferenceLinks?.evaluate(toAnalyzableDocument(content)) ?? [];
+    expect(findings).toHaveLength(1);
+  });
 });
 
 describe("integrity/broad-permissions", () => {
@@ -68,6 +81,12 @@ describe("integrity/broad-permissions", () => {
 
   it("does not flag normally scoped permission language", () => {
     const content = "This skill can read files inside the project directory.\n";
+    const findings = broadPermissions?.evaluate(toAnalyzableDocument(content)) ?? [];
+    expect(findings).toHaveLength(0);
+  });
+
+  it("does not flag broad-permission terms shown only as inline code", () => {
+    const content = "Document the `sudo` command, but do not grant elevated access.\n";
     const findings = broadPermissions?.evaluate(toAnalyzableDocument(content)) ?? [];
     expect(findings).toHaveLength(0);
   });

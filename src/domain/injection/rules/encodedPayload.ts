@@ -32,7 +32,13 @@ function pushMatches(
 ): void {
   for (const match of line.matchAll(pattern)) {
     const matchedText = match[0];
-    const quoted = isLikelyQuotedContext(doc, lineNumber, codeLines, matchedText);
+    const quoted = isLikelyQuotedContext(
+      doc,
+      lineNumber,
+      codeLines,
+      match.index ?? 0,
+      matchedText.length,
+    );
     findings.push({
       id: `${RULE_ID}:${lineNumber}:${match.index ?? 0}`,
       ruleId: RULE_ID,

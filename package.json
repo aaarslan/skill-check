@@ -1,6 +1,6 @@
 {
   "name": "skill-check",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "private": true,
   "description": "Compare two LLM skill Markdown files locally: diff, deterministic quality scoring, and heuristic prompt-injection detection. Runs entirely in the browser.",
   "keywords": [
@@ -32,6 +32,7 @@
     "prepare": "vp config"
   },
   "dependencies": {
+    "@phosphor-icons/react": "^2.1.10",
     "react": "^19.2.7",
     "react-dom": "^19.2.7"
   },

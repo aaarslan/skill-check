@@ -39,7 +39,7 @@
 }
 
 .categoryLabel {
-  font-size: 0.7rem;
+  font-size: var(--text-xs);
   text-align: center;
   color: var(--color-muted);
 }

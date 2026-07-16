@@ -1,6 +1,6 @@
 .empty {
   color: var(--color-muted);
-  font-size: 0.9rem;
+  font-size: var(--text-sm);
   padding: var(--space-3);
 }
 
@@ -13,6 +13,7 @@
   gap: var(--space-3);
   max-height: 24rem;
   overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .item {
@@ -29,12 +30,12 @@
 }
 
 .category {
-  font-size: 0.75rem;
+  font-size: var(--text-xs);
   color: var(--color-muted);
 }
 
 .line {
-  font-size: 0.75rem;
+  font-size: var(--text-xs);
   color: var(--color-muted);
   margin-left: auto;
   font-family: var(--font-mono);
@@ -47,17 +48,17 @@
 
 .explanation {
   color: var(--color-muted);
-  font-size: 0.88rem;
+  font-size: var(--text-sm);
   margin: var(--space-1) 0;
 }
 
 .suggestion {
-  font-size: 0.88rem;
+  font-size: var(--text-sm);
   margin: var(--space-1) 0;
 }
 
 .ruleId {
-  font-size: 0.75rem;
+  font-size: var(--text-xs);
   color: var(--color-muted);
   margin: var(--space-1) 0 0;
 }

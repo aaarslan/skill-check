@@ -15,14 +15,20 @@
 }
 
 .toggleButton {
+  min-height: 32px;
   padding: var(--space-1) var(--space-3);
   background: var(--color-surface);
   border: none;
   cursor: pointer;
+  transition: background-color 0.15s ease;
 }
 
 .toggleButton + .toggleButton {
   border-left: 1px solid var(--color-border);
+}
+
+.toggleButton:hover {
+  background: color-mix(in srgb, var(--color-accent) 8%, var(--color-surface));
 }
 
 .toggleButton[aria-pressed="true"] {
@@ -34,15 +40,17 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
-  font-size: 0.85rem;
+  min-height: 32px;
+  font-size: var(--text-sm);
   color: var(--color-muted);
+  cursor: pointer;
 }
 
 .counts {
   display: inline-flex;
   gap: var(--space-2);
   font-family: var(--font-mono);
-  font-size: 0.85rem;
+  font-size: var(--text-sm);
 }
 
 .added {
@@ -58,16 +66,29 @@
   align-items: center;
   gap: var(--space-2);
   margin-left: auto;
-  font-size: 0.85rem;
+  font-size: var(--text-sm);
   color: var(--color-muted);
 }
 
 .nav button {
-  padding: var(--space-1) var(--space-2);
+  min-height: 32px;
+  padding: var(--space-1) var(--space-3);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   background: var(--color-surface);
   cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.nav button:not(:disabled):hover {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 6%, var(--color-surface));
+}
+
+.nav button:not(:disabled):active {
+  background: color-mix(in srgb, var(--color-accent) 12%, var(--color-surface));
 }
 
 .nav button:disabled {

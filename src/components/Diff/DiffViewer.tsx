@@ -42,9 +42,10 @@ export function DiffViewer({ diff, ignoreWhitespace, onIgnoreWhitespaceChange }:
     setCurrentChangeIndex(index);
     const group = groups[index];
     if (group) {
+      const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
       rowRefs.current
         .get(group.startIndex)
-        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+        ?.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "center" });
     }
   };
 

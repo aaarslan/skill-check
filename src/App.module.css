@@ -9,24 +9,25 @@
 
 .header h1 {
   margin: 0 0 var(--space-1);
-  font-size: 1.6rem;
+  font-size: var(--text-xl);
+  letter-spacing: -0.01em;
 }
 
 .tagline {
   margin: 0;
   color: var(--color-muted);
-  max-width: 48rem;
+  max-width: 65ch;
 }
 
 .disclaimer {
   margin: 0;
-  max-width: 48rem;
+  max-width: 65ch;
   padding: var(--space-3) var(--space-4);
   border: 1px solid var(--color-border);
   border-left: 3px solid var(--color-warning);
   border-radius: var(--radius-md);
   background: var(--color-surface);
-  font-size: 0.85rem;
+  font-size: var(--text-sm);
 }
 
 .disclaimer strong {
@@ -35,19 +36,20 @@
 
 .inputGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(18rem, 100%), 1fr));
   gap: var(--space-4);
 }
 
 .twoCol {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(20rem, 100%), 1fr));
   gap: var(--space-4);
   margin-top: var(--space-2);
 }
 
 .sectionDisclaimer {
-  font-size: 0.8rem;
+  font-size: var(--text-sm);
   color: var(--color-muted);
+  max-width: 70ch;
   margin: 0;
 }

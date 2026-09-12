@@ -21,7 +21,11 @@ export function diffLines(
   const a = originalLines.map(compareKey);
   const b = candidateLines.map(compareKey);
 
-  const ops = diffOps(a, b);
+  const minimal = diffOps(a, b);
+  const ops: EditOp[] = minimal ?? [
+    ...a.map((_, aIndex) => ({ type: "delete" as const, aIndex })),
+    ...b.map((_, bIndex) => ({ type: "insert" as const, bIndex })),
+  ];
 
   const lines: DiffLine[] = ops.map((op) => diffLineFromOp(op, originalLines, candidateLines));
   const addedCount = lines.reduce((count, line) => count + (line.type === "added" ? 1 : 0), 0);
@@ -32,6 +36,7 @@ export function diffLines(
     addedCount,
     removedCount,
     identical: addedCount === 0 && removedCount === 0,
+    ...(minimal === null ? { bounded: true } : {}),
   };
 }
 
@@ -70,7 +75,7 @@ function normalizeWhitespace(line: string): string {
 }
 
 /** Computes the shortest edit script turning `a` into `b`. */
-function diffOps(a: readonly string[], b: readonly string[]): EditOp[] {
+function diffOps(a: readonly string[], b: readonly string[]): EditOp[] | null {
   const n = a.length;
   const m = b.length;
   if (n === 0 && m === 0) {
@@ -84,6 +89,8 @@ function diffOps(a: readonly string[], b: readonly string[]): EditOp[] {
 
   let found = false;
   for (let d = 0; d <= max && !found; d++) {
+    // Bound stored trace cells, including completely different large inputs.
+    if ((d + 1) * v.length > 2_000_000) return null;
     trace.push(v.slice());
     for (let k = -d; k <= d; k += 2) {
       let x: number;

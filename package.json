@@ -2,7 +2,7 @@
   "name": "skill-check",
   "version": "0.0.1",
   "private": true,
-  "description": "Compare two LLM skill Markdown files locally: diff, deterministic quality scoring, and heuristic prompt-injection detection. Runs entirely in the browser.",
+  "description": "Review skill files, compare revisions, and check local skill folders with deterministic analysis, portable reports, and a matching offline CLI.",
   "keywords": [
     "diff",
     "llm",
@@ -29,6 +29,9 @@
     "preview": "vp preview",
     "check": "vp check",
     "test": "vp test",
+    "test:cli": "node --test scripts/skillcheck.test.mjs",
+    "review": "node scripts/skillcheck.mjs",
+    "calibrate": "node scripts/skillcheck.mjs --calibration",
     "prepare": "vp config"
   },
   "dependencies": {

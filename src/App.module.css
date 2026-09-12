@@ -14,6 +14,75 @@
   box-shadow: inset 0 0 80px rgb(2 8 20 / 40%);
 }
 
+.workflowActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 14px 0;
+}
+.workflowActions [aria-pressed="true"] {
+  border-color: #7da3ff;
+  background: #18355a;
+}
+.workflowActions input[type="file"] {
+  max-width: 230px;
+  margin-left: 8px;
+}
+.singleInput {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+.reviewFinding {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--color-border);
+  overflow-wrap: anywhere;
+}
+.reviewFinding label {
+  display: block;
+  margin-block: 12px;
+}
+.reviewFinding textarea,
+.packageEditor textarea {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  margin-block: 8px;
+  padding: 12px;
+  color: #e5edf9;
+  background: #081426;
+  border: 1px solid #52627b;
+  border-radius: 8px;
+  resize: vertical;
+}
+.reviewFinding select {
+  padding: 8px;
+  color: #e5edf9;
+  background: #081426;
+  border: 1px solid #52627b;
+  border-radius: 6px;
+}
+.results summary {
+  padding-block: 16px;
+  cursor: pointer;
+}
+.results li {
+  margin-block: 10px;
+  overflow-wrap: anywhere;
+}
+.results table {
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.results td,
+.results th {
+  padding: 8px;
+  border-bottom: 1px solid #334056;
+  text-align: left;
+}
+.tableScroll {
+  overflow-x: auto;
+}
+
 .header {
   min-height: 61px;
   display: grid;

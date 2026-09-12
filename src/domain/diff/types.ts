@@ -12,6 +12,8 @@ export interface DiffResult {
   readonly addedCount: number;
   readonly removedCount: number;
   readonly identical: boolean;
+  /** Whole-file replacement fallback when a minimal diff would exceed the work budget. */
+  readonly bounded?: boolean;
 }
 
 export interface DiffOptions {

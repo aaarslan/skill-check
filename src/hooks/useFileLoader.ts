@@ -1,4 +1,5 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { INPUT_LIMITS, normalizePackagePath, validateContent } from "../domain/review/input.ts";
 import { toLoadedFile } from "../domain/shared/loadedFile.ts";
 import type { LoadedFile } from "../domain/shared/types.ts";
 
@@ -9,7 +10,7 @@ export type FileLoadState =
   | { readonly status: "error"; readonly message: string };
 
 const ACCEPTED_EXTENSIONS = [".md", ".markdown", ".txt"];
-const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024;
+const MAX_FILE_SIZE_BYTES = INPUT_LIMITS.fileBytes;
 
 function hasAcceptedExtension(filename: string): boolean {
   const lower = filename.toLowerCase();
@@ -29,6 +30,12 @@ export function useFileLoader(): FileLoaderApi {
   // Guards against a stale FileReader callback (from a superseded load) overwriting
   // the state set by a later load/clear call.
   const requestIdRef = useRef(0);
+  useEffect(
+    () => () => {
+      requestIdRef.current++;
+    },
+    [],
+  );
 
   const loadFromFile = useCallback((file: File) => {
     const requestId = ++requestIdRef.current;
@@ -38,7 +45,7 @@ export function useFileLoader(): FileLoaderApi {
       return;
     }
     if (file.size > MAX_FILE_SIZE_BYTES) {
-      setState({ status: "error", message: `"${file.name}" is too large (max 5 MB).` });
+      setState({ status: "error", message: `"${file.name}" is too large (max 256 KiB).` });
       return;
     }
 
@@ -49,7 +56,17 @@ export function useFileLoader(): FileLoaderApi {
         return;
       }
       const content = typeof reader.result === "string" ? reader.result : "";
-      setState({ status: "loaded", file: toLoadedFile(content, file.name) });
+      try {
+        setState({
+          status: "loaded",
+          file: toLoadedFile(validateContent(content), normalizePackagePath(file.name)),
+        });
+      } catch (cause) {
+        setState({
+          status: "error",
+          message: cause instanceof Error ? cause.message : "Invalid text file.",
+        });
+      }
     };
     reader.onerror = () => {
       if (requestIdRef.current !== requestId) {
@@ -62,7 +79,14 @@ export function useFileLoader(): FileLoaderApi {
 
   const loadFromText = useCallback((text: string) => {
     requestIdRef.current++;
-    setState({ status: "loaded", file: toLoadedFile(text, null) });
+    try {
+      setState({ status: "loaded", file: toLoadedFile(validateContent(text), null) });
+    } catch (cause) {
+      setState({
+        status: "error",
+        message: cause instanceof Error ? cause.message : "Invalid text.",
+      });
+    }
   }, []);
 
   const clear = useCallback(() => {

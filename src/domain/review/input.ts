@@ -28,6 +28,11 @@ export function validateContent(content: string): string {
   return normalized;
 }
 
+/** Match the CLI's fatal UTF-8 decoding instead of silently replacing invalid bytes. */
+export function decodeUtf8(bytes: AllowSharedBufferSource): string {
+  return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+}
+
 /** Portable, case-sensitive relative package paths. No filesystem or URL access. */
 export function normalizePackagePath(path: string): string {
   const normalized = path.normalize("NFC").replace(/\\/gu, "/");

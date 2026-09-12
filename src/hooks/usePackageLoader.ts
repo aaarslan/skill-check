@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   INPUT_LIMITS,
   TEXT_FILE_PATTERN,
+  decodeUtf8,
   prepareSources,
   type ReviewSource,
 } from "../domain/review/input.ts";
@@ -55,10 +56,18 @@ export function usePackageLoader() {
       const root = relative[0]?.split("/")[0];
       const strip = relative.every((path) => path.includes("/") && path.split("/")[0] === root);
       const loaded = await Promise.all(
-        files.map(async (file, index) => ({
-          path: strip ? relative[index]!.slice(root!.length + 1) : relative[index]!,
-          content: await file.text(),
-        })),
+        files.map(async (file, index) => {
+          let content: string;
+          try {
+            content = decodeUtf8(await file.arrayBuffer());
+          } catch {
+            throw new Error(`"${file.name}" must be valid UTF-8 text.`);
+          }
+          return {
+            path: strip ? relative[index]!.slice(root!.length + 1) : relative[index]!,
+            content,
+          };
+        }),
       );
       const prepared = prepareSources(loaded);
       if (current === generation.current) setSources(prepared);

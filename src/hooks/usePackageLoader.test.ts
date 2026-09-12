@@ -1,20 +1,23 @@
-import { act, renderHook } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vite-plus/test";
 import { usePackageLoader } from "./usePackageLoader.ts";
 import { useFileLoader } from "./useFileLoader.ts";
 
 function delayedFile() {
-  let finish!: (text: string) => void;
-  const promise = new Promise<string>((resolve) => {
-    finish = resolve;
+  let resolveBytes!: (bytes: ArrayBuffer) => void;
+  const promise = new Promise<ArrayBuffer>((resolve) => {
+    resolveBytes = resolve;
   });
   const file = {
     name: "SKILL.md",
     webkitRelativePath: "demo/SKILL.md",
     size: 10,
-    text: () => promise,
+    arrayBuffer: () => promise,
   } as File;
-  return { file, finish };
+  return {
+    file,
+    finish: (text: string) => resolveBytes(new TextEncoder().encode(text).buffer),
+  };
 }
 
 describe("input lifecycle", () => {
@@ -47,7 +50,7 @@ describe("input lifecycle", () => {
       name: "test.md",
       webkitRelativePath: "demo/refs/test.md",
       size: 10,
-      text: async () => "# Test",
+      arrayBuffer: async () => new TextEncoder().encode("# Test").buffer,
     } as File;
     await act(async () => {
       await result.current.load([file]);
@@ -60,9 +63,9 @@ describe("input lifecycle", () => {
     const file = {
       name: "payload.zip",
       size: 10,
-      text: async () => {
+      arrayBuffer: async () => {
         read = true;
-        return "";
+        return new ArrayBuffer(0);
       },
     } as File;
     await act(async () => {
@@ -70,6 +73,30 @@ describe("input lifecycle", () => {
     });
     expect(read).toBe(false);
     expect(result.current.error).toContain("supported text");
+  });
+  it("rejects malformed UTF-8 before package analysis", async () => {
+    const { result } = renderHook(() => usePackageLoader());
+    const file = {
+      name: "broken.md",
+      size: 3,
+      arrayBuffer: async () => new Uint8Array([0xff, 0xfe, 0xff]).buffer,
+    } as File;
+    await act(async () => {
+      await result.current.load([file]);
+    });
+    expect(result.current.sources).toEqual([]);
+    expect(result.current.error).toContain("valid UTF-8");
+  });
+  it("rejects malformed UTF-8 in a single file", async () => {
+    const { result } = renderHook(() => useFileLoader());
+    const file = {
+      name: "broken.md",
+      size: 3,
+      arrayBuffer: async () => new Uint8Array([0xff, 0xfe, 0xff]).buffer,
+    } as File;
+    act(() => result.current.loadFromFile(file));
+    await waitFor(() => expect(result.current.state.status).toBe("error"));
+    expect(result.current.state).toMatchObject({ message: expect.stringContaining("valid UTF-8") });
   });
   it("applies the same byte limit to pasted text", () => {
     const { result } = renderHook(() => useFileLoader());

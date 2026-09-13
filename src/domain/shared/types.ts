@@ -12,7 +12,7 @@ export interface FindingLocation {
   readonly excerpt: string;
 }
 
-/** A markdown skill file loaded into the browser, never persisted or transmitted. */
+/** Skill text held in memory; only an explicit report export writes it to disk. */
 export interface LoadedFile {
   readonly filename: string | null;
   readonly content: string;

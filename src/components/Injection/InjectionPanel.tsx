@@ -2,7 +2,7 @@ import { useId, useMemo } from "react";
 import { countHighSuspicion } from "../../domain/injection/detect.ts";
 import { INJECTION_CATEGORIES, SUSPICION_ORDER } from "../../domain/injection/taxonomy.ts";
 import type { InjectionFinding } from "../../domain/injection/types.ts";
-import { useDismissedFindings } from "../../hooks/useDismissedFindings.ts";
+import type { DismissedFindingsApi } from "../../hooks/useDismissedFindings.ts";
 import { useFindingFilters } from "../../hooks/useFindingFilters.ts";
 import { FindingFilters } from "../Filters/FindingFilters.tsx";
 import { SEVERITY_LABELS } from "../severityLabels.ts";
@@ -13,6 +13,7 @@ import styles from "./InjectionPanel.module.css";
 interface InjectionPanelProps {
   readonly slotLabel: string;
   readonly findings: readonly InjectionFinding[];
+  readonly dismissed: DismissedFindingsApi;
 }
 
 const SUSPICION_OPTIONS = SUSPICION_ORDER.map((value) => ({
@@ -24,9 +25,8 @@ const CATEGORY_OPTIONS = INJECTION_CATEGORIES.map((value) => ({
   label: INJECTION_CATEGORY_LABELS[value],
 }));
 
-export function InjectionPanel({ slotLabel, findings }: InjectionPanelProps) {
+export function InjectionPanel({ slotLabel, findings, dismissed }: InjectionPanelProps) {
   const headingId = useId();
-  const dismissed = useDismissedFindings();
   const {
     selectedSeverities: selectedSuspicions,
     selectedCategories,

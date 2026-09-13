@@ -119,7 +119,9 @@ export function FileInputPanel({ slotLabel, slotKey, loader }: FileInputPanelPro
               <span className={styles.dropzonePrompt}>
                 Drag &amp; drop a .md file here, or click to browse
               </span>
-              <span className={styles.dropzoneHelp}>Markdown or text files, up to 5 MB</span>
+              <span className={styles.dropzoneHelp}>
+                Markdown or text, up to 256 KiB / 4,000 lines
+              </span>
               <span className={styles.browseButton}>Browse files</span>
             </label>
           </div>

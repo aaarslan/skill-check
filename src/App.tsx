@@ -17,7 +17,12 @@ import { ComparisonSummary } from "./components/Quality/ComparisonSummary.tsx";
 import { QualityPanel } from "./components/Quality/QualityPanel.tsx";
 import { countHighSuspicion } from "./domain/injection/detect.ts";
 import { useSkillCheckAnalysis } from "./hooks/useSkillCheckAnalysis.ts";
+import { useReviewDecisions } from "./hooks/useReviewDecisions.ts";
 import styles from "./App.module.css";
+import { ReviewWorkflow } from "./components/ReviewWorkflow.tsx";
+import { PackageReview } from "./components/PackageReview.tsx";
+import { CalibrationPanel } from "./components/CalibrationPanel.tsx";
+import { SAMPLE_ORIGINAL, SAMPLE_CANDIDATE } from "./domain/review/samples.ts";
 
 type ResultTab = "overview" | "diff" | "quality" | "injection";
 
@@ -43,7 +48,9 @@ export function App() {
   const [ignoreWhitespace, setIgnoreWhitespace] = useState(false);
   const [activeTab, setActiveTab] = useState<ResultTab>("overview");
   const [showDisclaimer, setShowDisclaimer] = useState(true);
-  const { original, candidate, view } = useSkillCheckAnalysis(ignoreWhitespace);
+  const [mode, setMode] = useState<"single" | "compare" | "package">("single");
+  const { original, candidate, view, report } = useSkillCheckAnalysis(ignoreWhitespace);
+  const workflow = useReviewDecisions(report);
 
   const originalSlot = view.kind === "both" || view.kind === "original-only" ? view.original : null;
   const candidateSlot =
@@ -135,7 +142,7 @@ export function App() {
           <h1>Skillcheck</h1>
         </div>
         <p className={styles.tagline}>
-          Analyze one LLM skill Markdown file or compare two with deterministic quality scoring and
+          Review a skill file, compare revisions, or inspect a local folder with quality scoring and
           prompt-injection pattern detection — all in your browser.
         </p>
         <nav className={styles.headerActions} aria-label="Application actions">
@@ -172,113 +179,186 @@ export function App() {
         </aside>
       )}
 
-      <section className={styles.inputGrid} aria-label="File input">
-        <FileInputPanel slotLabel="Original" slotKey="original" loader={original} />
-        <FileInputPanel slotLabel="Candidate" slotKey="candidate" loader={candidate} />
-      </section>
-
-      <section id="results" className={styles.results} aria-label="Analysis results">
-        <div className={styles.metricGrid}>
-          <Metric icon={<ChartBar size={24} />} label="Quality score" value={score} />
-          <Metric icon={<Shield size={24} />} label="Risk" value={risk} />
-          <Metric
-            icon={<ListBullets size={24} />}
-            label="Changed lines"
-            value={changedSections === null ? "—" : changedSections.toLocaleString()}
-          />
-          <Metric
-            icon={<Hash size={24} />}
-            label="Est. total tokens"
-            value={totalTokens === null ? "—" : totalTokens.toLocaleString()}
-          />
-        </div>
-
-        <div className={styles.tabs} role="tablist" aria-label="Analysis sections">
-          {tabs.map((tab) => (
+      <section className={styles.results} aria-label="Choose review mode">
+        <h2>Start with a file or try an example</h2>
+        <div className={styles.workflowActions}>
+          {(["single", "compare", "package"] as const).map((option) => (
             <button
-              key={tab.id}
-              id={`${tab.id}-tab`}
-              className={styles.tab}
+              key={option}
               type="button"
-              role="tab"
-              aria-selected={activeTab === tab.id}
-              aria-controls={`${tab.id}-panel`}
-              tabIndex={activeTab === tab.id ? 0 : -1}
-              onClick={() => setActiveTab(tab.id)}
-              onKeyDown={handleTabKeyDown}
+              className={styles.secondaryAction}
+              aria-pressed={mode === option}
+              onClick={() => {
+                setMode(option);
+                if (option === "single") candidate.clear();
+              }}
             >
-              {tab.label}
+              {option === "single"
+                ? "Review one file"
+                : option === "compare"
+                  ? "Compare revisions"
+                  : "Review folder"}
             </button>
           ))}
-        </div>
-
-        <div
-          id={`${activeTab}-panel`}
-          className={styles.tabPanel}
-          role="tabpanel"
-          aria-labelledby={`${activeTab}-tab`}
-        >
-          {!bothLoaded && activeTab !== "quality" && activeTab !== "injection" && (
-            <EmptyState title={waitingState.title} description={waitingState.description} />
+          {mode !== "package" && (
+            <button
+              type="button"
+              className={styles.secondaryAction}
+              onClick={() => {
+                original.loadFromText(SAMPLE_ORIGINAL);
+                if (mode === "compare") candidate.loadFromText(SAMPLE_CANDIDATE);
+              }}
+            >
+              Try review example
+            </button>
           )}
-
-          {bothLoaded && activeTab === "overview" && (
-            <ComparisonSummary comparison={view.comparison} />
-          )}
-
-          {bothLoaded && activeTab === "diff" && (
-            <DiffViewer
-              diff={view.diff}
-              ignoreWhitespace={ignoreWhitespace}
-              onIgnoreWhitespaceChange={setIgnoreWhitespace}
-            />
-          )}
-
-          {activeTab === "quality" && (
-            <div className={styles.analysisSection}>
-              {originalSlot || candidateSlot ? (
-                <>
-                  <p className={styles.sectionDisclaimer}>
-                    Deterministic quality rules provide review signals, not an objective guarantee.
-                  </p>
-                  <div className={styles.twoCol}>
-                    {originalSlot && (
-                      <QualityPanel slotLabel="Original" report={originalSlot.quality} />
-                    )}
-                    {candidateSlot && (
-                      <QualityPanel slotLabel="Candidate" report={candidateSlot.quality} />
-                    )}
-                  </div>
-                </>
-              ) : (
-                <EmptyState title={waitingState.title} description={waitingState.description} />
-              )}
-            </div>
-          )}
-
-          {activeTab === "injection" && (
-            <div className={styles.analysisSection}>
-              {originalSlot || candidateSlot ? (
-                <>
-                  <p className={styles.sectionDisclaimer}>
-                    Pattern matches are heuristic signals to review, not a safety verdict.
-                  </p>
-                  <div className={styles.twoCol}>
-                    {originalSlot && (
-                      <InjectionPanel slotLabel="Original" findings={originalSlot.injection} />
-                    )}
-                    {candidateSlot && (
-                      <InjectionPanel slotLabel="Candidate" findings={candidateSlot.injection} />
-                    )}
-                  </div>
-                </>
-              ) : (
-                <EmptyState title={waitingState.title} description={waitingState.description} />
-              )}
-            </div>
+          {mode === "single" && originalSlot && (
+            <button
+              type="button"
+              className={styles.secondaryAction}
+              onClick={() => {
+                candidate.loadFromText(originalSlot.file.content);
+                setMode("compare");
+              }}
+            >
+              Create editable candidate
+            </button>
           )}
         </div>
+        <p className={styles.sectionDisclaimer}>
+          The synthetic example includes an instruction override. Compare revisions to inspect a
+          manually revised version; score changes do not establish better agent performance.
+        </p>
       </section>
+      {mode === "package" ? (
+        <PackageReview />
+      ) : (
+        <>
+          <section
+            className={mode === "single" ? styles.singleInput : styles.inputGrid}
+            aria-label="File input"
+          >
+            <FileInputPanel slotLabel="Original" slotKey="original" loader={original} />
+            {mode === "compare" && (
+              <FileInputPanel slotLabel="Candidate" slotKey="candidate" loader={candidate} />
+            )}
+          </section>
+
+          <section id="results" className={styles.results} aria-label="Analysis results">
+            <div className={styles.metricGrid}>
+              <Metric icon={<ChartBar size={24} />} label="Quality score" value={score} />
+              <Metric icon={<Shield size={24} />} label="Risk" value={risk} />
+              <Metric
+                icon={<ListBullets size={24} />}
+                label="Changed lines"
+                value={changedSections === null ? "—" : changedSections.toLocaleString()}
+              />
+              <Metric
+                icon={<Hash size={24} />}
+                label="Est. total tokens"
+                value={totalTokens === null ? "—" : totalTokens.toLocaleString()}
+              />
+            </div>
+
+            <div className={styles.tabs} role="tablist" aria-label="Analysis sections">
+              {tabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  id={`${tab.id}-tab`}
+                  className={styles.tab}
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === tab.id}
+                  aria-controls={`${tab.id}-panel`}
+                  tabIndex={activeTab === tab.id ? 0 : -1}
+                  onClick={() => setActiveTab(tab.id)}
+                  onKeyDown={handleTabKeyDown}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            <div
+              id={`${activeTab}-panel`}
+              className={styles.tabPanel}
+              role="tabpanel"
+              aria-labelledby={`${activeTab}-tab`}
+            >
+              {!bothLoaded && activeTab !== "quality" && activeTab !== "injection" && (
+                <EmptyState title={waitingState.title} description={waitingState.description} />
+              )}
+
+              {bothLoaded && activeTab === "overview" && (
+                <ComparisonSummary comparison={view.comparison} />
+              )}
+
+              {bothLoaded && activeTab === "diff" && (
+                <DiffViewer
+                  diff={view.diff}
+                  ignoreWhitespace={ignoreWhitespace}
+                  onIgnoreWhitespaceChange={setIgnoreWhitespace}
+                />
+              )}
+
+              {activeTab === "quality" && (
+                <div className={styles.analysisSection}>
+                  {originalSlot || candidateSlot ? (
+                    <>
+                      <p className={styles.sectionDisclaimer}>
+                        Deterministic quality rules provide review signals, not an objective
+                        guarantee.
+                      </p>
+                      <div className={styles.twoCol}>
+                        {originalSlot && (
+                          <QualityPanel slotLabel="Original" report={originalSlot.quality} />
+                        )}
+                        {candidateSlot && (
+                          <QualityPanel slotLabel="Candidate" report={candidateSlot.quality} />
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    <EmptyState title={waitingState.title} description={waitingState.description} />
+                  )}
+                </div>
+              )}
+
+              {activeTab === "injection" && (
+                <div className={styles.analysisSection}>
+                  {originalSlot || candidateSlot ? (
+                    <>
+                      <p className={styles.sectionDisclaimer}>
+                        Pattern matches are heuristic signals to review, not a safety verdict.
+                      </p>
+                      <div className={styles.twoCol}>
+                        {originalSlot && (
+                          <InjectionPanel
+                            slotLabel="Original"
+                            findings={originalSlot.injection}
+                            dismissed={workflow.injectionDismissals(originalSlot)}
+                          />
+                        )}
+                        {candidateSlot && (
+                          <InjectionPanel
+                            slotLabel="Candidate"
+                            findings={candidateSlot.injection}
+                            dismissed={workflow.injectionDismissals(candidateSlot)}
+                          />
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    <EmptyState title={waitingState.title} description={waitingState.description} />
+                  )}
+                </div>
+              )}
+            </div>
+          </section>
+          {report && <ReviewWorkflow review={report} workflow={workflow} />}
+        </>
+      )}
+      <CalibrationPanel />
     </main>
   );
 }

@@ -1,15 +1,16 @@
 # Skillcheck
 
-Compare two LLM skill Markdown files side by side: a structural **diff**, a
-deterministic **quality score**, and heuristic **prompt-injection detection**.
-Everything runs locally in your browser. Nothing is uploaded, stored, or
-transmitted.
+Review one skill file, compare revisions, or inspect a local skill folder with
+a structural **diff**, deterministic **quality scoring**, and heuristic
+**prompt-injection detection**. Start with built-in synthetic examples, edit
+the source, record review decisions, and export versioned JSON or Markdown.
+Analysis runs locally in the browser or through the matching Node CLI. Source
+text is held in memory unless you explicitly export a report; it is not uploaded.
 
 <p>
   <img alt="React 19" src="https://img.shields.io/badge/React-19-149eca">
   <img alt="TypeScript strict" src="https://img.shields.io/badge/TypeScript-strict-3178c6">
   <img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-green">
-  <img alt="Tests: 97" src="https://img.shields.io/badge/tests-97%20passing-brightgreen">
 </p>
 
 ---
@@ -36,13 +37,15 @@ The software is provided "as is", without warranty of any kind. See
 
 ## What it does
 
-Load an **Original** and a **Candidate** Markdown file (upload, drag and drop,
-or paste). Skillcheck then shows three views:
+Choose **Review one file**, **Compare revisions**, or **Review folder**. Upload,
+drop, paste, or try a built-in example. The one-file flow can create an editable
+candidate while preserving the original. Apply edits to rerun the analysis.
 
 ### 1. Diff
 
 - Unified and side-by-side layouts.
-- Myers O(ND) line diff with an optional "ignore whitespace" mode.
+- Myers O(ND) line diff with an optional "ignore whitespace" mode. Large changes
+  fall back to a labeled whole-file replacement when the trace budget is exceeded.
 - Keyboard navigation that jumps between changed regions.
 
 ### 2. Quality score
@@ -79,17 +82,62 @@ To reduce noise, the detector:
 Each finding carries a suspicion level (high, medium, low) and can be dismissed
 as you triage.
 
+### 4. Folder review and portable reports
+
+Select a folder containing SKILL.md, Markdown references, and supported text
+scripts. Every selected file is scanned as inert text. Inline and full/collapsed
+reference Markdown links outside fenced blocks are resolved within that selection,
+including relative parent paths, encoded spaces, and heading fragments. Missing
+files, broken anchors, undefined references, and escaping paths become findings.
+Revision comparisons keep files independent; only folder review resolves package links.
+
+Limits apply equally to browser and CLI analysis: **100 files, 256 KiB and 4,000
+lines per file, 2 MiB total**. BOM and CRLF/CR are normalized; suspicious Unicode
+stays visible. Paths are relative, NFC-normalized, and case-sensitive. Duplicate
+paths, traversal, absolute paths, control characters, query/fragment markers, and
+percent signs in package filenames are rejected. CLI folder traversal rejects
+symlinks, more than 500 directory entries, and depth over 20.
+
+Supported extensions: `.md`, `.markdown`, `.txt`, `.json`, `.yaml`, `.yml`, `.js`,
+`.mjs`, `.cjs`, `.ts`, `.mts`, `.cts`, `.tsx`, `.jsx`, `.py`, `.sh`, `.ps1`, `.toml`,
+`.csv`, `.css`, `.html`. Binary assets and archives are rejected; select a small
+text-only skill folder. No archive extraction, script execution, external link
+fetching, dynamic import resolution, or behavioral evaluation occurs. Plain-text
+paths, shorthand Markdown references, and non-text dependencies are not resolved.
+
+The **Review findings and keep a record** panel records open/reviewed/dismissed
+decisions and notes. Decisions do not alter scores and reset when analyzed text
+changes. Exports contain applied content only. JSON schema `1.0` includes normalized
+source, complete analysis, rule version, limitations, and decisions; Markdown is
+a readable summary without source text. Review exported text before sharing it.
+Comparison reports include a line diff with whitespace significant, independent
+of display filters. Injection-panel dismissals and report decisions share state.
+
+### 5. Inspectable calibration
+
+The app includes 21 author-labeled synthetic cases (`synthetic-1.0`) covering all
+ten categories, benign guidance, quoted examples, and obfuscation. Expand
+**Inspect calibration** for source text, label rationale, predictions, false
+positives, and misses. A positive prediction means medium or high suspicion;
+metrics are per document/category. False-positive rates use negative examples;
+miss rates use positive examples. Zero denominators are unavailable, not zero.
+
+This corpus was used during development. It is small, not held out, not independently
+adjudicated, and not representative of real-world prevalence. Its recorded mistakes
+are intentionally visible. It does not measure skill effectiveness or establish
+safety. See `src/domain/calibration/fixtures.ts` and reproduce with `pnpm calibrate`.
+
 ### Privacy
 
-There is no backend. All parsing, scoring, and scanning happen in your browser
-with no network requests. You can verify this in your browser's network tab, or
-run it fully offline.
+There is no analysis backend. Selected content is not transmitted. The browser
+loads the application assets; parsing, scoring, and scanning run locally. The
+CLI does not make network requests. Reports are written only when you export them.
 
 ---
 
 ## Quick start
 
-Requires [Node.js](https://nodejs.org) 22+ and [pnpm](https://pnpm.io) 11+.
+Requires [Node.js](https://nodejs.org) 22.18+ and [pnpm](https://pnpm.io) 11+.
 
 ```bash
 pnpm install     # install dependencies
@@ -98,6 +146,33 @@ pnpm dev         # start the dev server, then open the printed URL
 
 Then load two Markdown skill files in the browser and read the diff, scores,
 and findings.
+
+### Local CLI and optional CI gate
+
+The CLI imports the same pure `analyzeReview` entrypoint as the browser. It needs
+Node's built-in TypeScript stripping (22.18+), with no model/API credentials or
+runtime dependencies. Run it from this checkout:
+
+```bash
+node scripts/skillcheck.mjs path/to/SKILL.md
+node scripts/skillcheck.mjs --compare before.md after.md --format md
+node scripts/skillcheck.mjs --folder path/to/skill --output review.json
+node scripts/skillcheck.mjs --calibration --output calibration.json
+node --test scripts/skillcheck.test.mjs
+```
+
+Output files must not already exist, preventing accidental source/report overwrites.
+For CI, check out a pinned Skillcheck revision and run the same command against
+your selected skill folder:
+
+```bash
+node scripts/skillcheck.mjs --folder path/to/skill --fail-on-high --output review.json
+```
+
+Exit `0` means analysis completed, `1` means the explicitly requested high-suspicion
+gate found a match, and `2` means invalid input or an I/O error. Store the report as
+an artifact even when the gate fails. This optional gate is a review signal, not a
+safety clearance; without `--fail-on-high`, findings do not change the exit status.
 
 ### Other commands
 

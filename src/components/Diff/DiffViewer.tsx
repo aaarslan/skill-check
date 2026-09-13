@@ -80,6 +80,12 @@ export function DiffViewer({ diff, ignoreWhitespace, onIgnoreWhitespaceChange }:
 
   return (
     <section className={styles.viewer} aria-label="Diff viewer">
+      {diff.bounded && (
+        <p role="status">
+          Large change: showing a whole-file replacement to keep the review responsive. Changed-line
+          counts are not a minimal diff.
+        </p>
+      )}
       <DiffControls
         viewMode={viewMode}
         onViewModeChange={handleViewModeChange}

@@ -1,7 +1,0 @@
-# Code owners are automatically requested for review on every pull request.
-# Combined with branch protection ("Require review from Code Owners"), this
-# enforces the project's maintainer-only merge policy. See CONTRIBUTING.md.
-#
-# Replace @aaarslan below if your GitHub handle differs.
-
-* @aaarslan

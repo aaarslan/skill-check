@@ -7,7 +7,8 @@ import {
 } from "../../shared/markdown.ts";
 import type { QualityFinding, QualityRule } from "../types.ts";
 
-const FRONTMATTER_PATTERN = /^---\s*$/u;
+import { parseFrontmatter } from "../../spec/frontmatter.ts";
+
 const TRIGGER_PATTERNS: RegExp[] = [
   /\buse (?:this|the)?\s*(?:skill|tool) when\b/iu,
   /\btrigger(?:s)? (?:on|when)\b/iu,
@@ -18,42 +19,14 @@ const TRIGGER_PATTERNS: RegExp[] = [
   /\bactivat(?:e|es|ion) when\b/iu,
 ];
 
-function findFrontmatter(
-  doc: AnalyzableDocument,
-): { name: string | null; description: string | null } | null {
-  if (!doc.lines[0] || !FRONTMATTER_PATTERN.test(doc.lines[0])) {
-    return null;
-  }
-  let name: string | null = null;
-  let description: string | null = null;
-  for (let i = 1; i < doc.lines.length; i++) {
-    const line = doc.lines[i];
-    if (line === undefined) {
-      break;
-    }
-    if (FRONTMATTER_PATTERN.test(line)) {
-      return { name, description };
-    }
-    const nameMatch = /^name:\s*(.+)$/iu.exec(line);
-    const descMatch = /^description:\s*(.+)$/iu.exec(line);
-    if (nameMatch) {
-      name = (nameMatch[1] ?? "").trim() || null;
-    }
-    if (descMatch) {
-      description = (descMatch[1] ?? "").trim() || null;
-    }
-  }
-  return null;
-}
-
 const hasPurposeStatement: QualityRule = {
   id: "purpose/has-purpose-statement",
   category: "purpose",
   description:
     "Checks for a clear name, description, scope, or purpose near the top of the document.",
   evaluate(doc: AnalyzableDocument): QualityFinding[] {
-    const frontmatter = findFrontmatter(doc);
-    if (frontmatter && frontmatter.name && frontmatter.description) {
+    const fm = parseFrontmatter(doc.lines.join("\n"));
+    if (fm.present && fm.fields["name"] && fm.fields["description"]) {
       return [];
     }
 

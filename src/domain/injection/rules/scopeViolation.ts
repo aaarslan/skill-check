@@ -32,6 +32,11 @@ const PATTERNS: readonly PatternSpec[] = [
     rationale: "Directly asks to act outside the declared scope or role.",
     suspicion: "medium",
   },
+  {
+    pattern:
+      /\b(?:access|read|open|modify|delete)\b[^.\n]{0,30}\boutside (?:the )?(?:project|workspace|working|current) (?:directory|folder|scope)\b/iu,
+    rationale: "Requests file access outside the declared project scope.",
+  },
 ];
 
 export const scopeViolationRule: InjectionRule = {

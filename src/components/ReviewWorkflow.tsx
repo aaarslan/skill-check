@@ -2,13 +2,15 @@ import type { ReviewDecisions } from "../hooks/useReviewDecisions.ts";
 import type { Review } from "../domain/review/analyze.ts";
 import {
   exportReview,
+  importDecisions,
   markdownReport,
   reviewFindings,
+  sarifReport,
   type FindingDecision,
 } from "../domain/review/report.ts";
 import styles from "../App.module.css";
 
-function download(text: string, extension: "json" | "md") {
+function download(text: string, extension: "json" | "md" | "sarif") {
   const url = URL.createObjectURL(
     new Blob([text], { type: extension === "json" ? "application/json" : "text/markdown" }),
   );
@@ -50,6 +52,33 @@ export function ReviewWorkflow({
         >
           Export Markdown report
         </button>
+        <button
+          className={styles.secondaryAction}
+          type="button"
+          onClick={() => download(JSON.stringify(sarifReport(review, decisions), null, 2), "sarif")}
+        >
+          Export SARIF
+        </button>
+        <label className={styles.secondaryAction}>
+          Import decisions
+          <input
+            aria-label="Import decisions from a JSON report"
+            type="file"
+            accept="application/json,.json"
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              event.target.value = "";
+              if (!file) return;
+              void file.text().then((text) => {
+                try {
+                  workflow.importAll(importDecisions(text, review));
+                } catch {
+                  // Invalid report files are ignored rather than crashing the review.
+                }
+              });
+            }}
+          />
+        </label>
       </div>
       <p className={styles.sectionDisclaimer}>
         Rules {review.ruleVersion} · Report {review.schemaVersion}. JSON includes source text;

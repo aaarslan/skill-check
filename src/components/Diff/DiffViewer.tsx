@@ -19,6 +19,7 @@ interface DiffViewerProps {
 export function DiffViewer({ diff, ignoreWhitespace, onIgnoreWhitespaceChange }: DiffViewerProps) {
   const [viewMode, setViewMode] = useState<DiffViewMode>("side-by-side");
   const [currentChangeIndex, setCurrentChangeIndex] = useState(-1);
+  const [showAllRows, setShowAllRows] = useState(false);
   const rowRefs = useRef(new Map<number, HTMLElement>());
 
   const sideBySideRows = useMemo(() => buildSideBySideRows(diff), [diff]);
@@ -39,6 +40,7 @@ export function DiffViewer({ diff, ignoreWhitespace, onIgnoreWhitespaceChange }:
   }, []);
 
   const goToGroup = (index: number) => {
+    setShowAllRows(true);
     setCurrentChangeIndex(index);
     const group = groups[index];
     if (group) {
@@ -98,13 +100,35 @@ export function DiffViewer({ diff, ignoreWhitespace, onIgnoreWhitespaceChange }:
         onPrevChange={handlePrevChange}
         onNextChange={handleNextChange}
       />
-      <div className={styles.scrollArea}>
-        {viewMode === "unified" ? (
-          <UnifiedDiff lines={diff.lines} registerRowRef={registerRowRef} />
-        ) : (
-          <SideBySideDiff rows={sideBySideRows} registerRowRef={registerRowRef} />
-        )}
-      </div>
+      {(() => {
+        const rowCount = viewMode === "unified" ? diff.lines.length : sideBySideRows.length;
+        const windowed = !showAllRows && rowCount > 600;
+        return (
+          <>
+            {windowed && (
+              <p role="status">
+                Showing the first 600 of {rowCount} rows to keep the review responsive.{" "}
+                <button type="button" onClick={() => setShowAllRows(true)}>
+                  Show all rows
+                </button>
+              </p>
+            )}
+            <div className={styles.scrollArea}>
+              {viewMode === "unified" ? (
+                <UnifiedDiff
+                  lines={windowed ? diff.lines.slice(0, 600) : diff.lines}
+                  registerRowRef={registerRowRef}
+                />
+              ) : (
+                <SideBySideDiff
+                  rows={windowed ? sideBySideRows.slice(0, 600) : sideBySideRows}
+                  registerRowRef={registerRowRef}
+                />
+              )}
+            </div>
+          </>
+        );
+      })()}
     </section>
   );
 }

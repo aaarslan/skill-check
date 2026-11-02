@@ -16,8 +16,9 @@ export function CalibrationPanel() {
         <div className={styles.tableScroll}>
           <table>
             <caption>
-              False positives use negative examples as denominator; misses use positive examples.
-              Each example can have multiple labels.
+              Held-out split only ({result.splitCounts.heldout} cases; {result.splitCounts.dev} dev
+              cases excluded). False positives use negative examples as denominator; misses use
+              positive examples. Each example can have multiple labels.
             </caption>
             <thead>
               <tr>
@@ -27,7 +28,7 @@ export function CalibrationPanel() {
               </tr>
             </thead>
             <tbody>
-              {result.categories.map((category) => (
+              {result.splits.heldout.map((category) => (
                 <tr key={category.category}>
                   <th scope="row">{category.category}</th>
                   <td>
@@ -52,7 +53,7 @@ export function CalibrationPanel() {
           {result.cases.map((item) => (
             <article className={styles.reviewFinding} key={item.id}>
               <h3>
-                {item.id} · {item.kind}
+                {item.id} · {item.kind} · {item.split ?? "dev"}
               </h3>
               <p>{item.rationale}</p>
               <pre style={{ whiteSpace: "pre-wrap" }}>{item.content}</pre>

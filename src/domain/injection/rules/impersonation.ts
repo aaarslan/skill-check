@@ -24,6 +24,19 @@ const PATTERNS: readonly PatternSpec[] = [
     pattern: /\bacting as (?:the )?(?:system|developer|admin)\b/iu,
     rationale: "Explicitly claims to act as a privileged role.",
   },
+  {
+    pattern: /\byou are now (?:the )?(?:system|developer|administrator|admin)\b/iu,
+    rationale: "Reassigns the reader to a privileged system/developer/administrator role.",
+  },
+  {
+    pattern: /\bthis is an? (?:system|developer|admin) message\b/iu,
+    rationale: "Claims the message itself originates from a privileged role.",
+  },
+  {
+    pattern: /\b(?:message|instruction) (?:with|at) (?:the )?highest priority\b/iu,
+    rationale: "Claims highest-priority authority for an unprivileged document.",
+    suspicion: "medium",
+  },
 ];
 
 export const impersonationRule: InjectionRule = {

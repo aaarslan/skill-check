@@ -44,6 +44,11 @@ const PATTERNS: readonly PatternSpec[] = [
     rationale: "Mimics tool-call syntax to inject a fake function invocation.",
     suspicion: "medium",
   },
+  {
+    pattern: /\[\s*\/?\s*(?:SYSTEM|SYS|ADMIN|DEVELOPER)\s*\]/u,
+    rationale: "Fake bracketed role delimiter mimicking a privileged message boundary.",
+    suspicion: "medium",
+  },
 ];
 
 export const fakeDelimiterRule: InjectionRule = {

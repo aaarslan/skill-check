@@ -13,9 +13,14 @@ import {
   type ReviewSource,
 } from "./input.ts";
 import type { QualityFinding } from "../quality/types.ts";
+import {
+  isSkillDocumentPath,
+  validateSkillDocument,
+  validateSkillPackage,
+} from "../spec/validate.ts";
 
-export const RULE_VERSION = "2026.09.12.1";
-export const REPORT_VERSION = "1.0";
+export const RULE_VERSION = "2026.11.02.1";
+export const REPORT_VERSION = "1.1";
 export type ReviewMode = "single" | "compare" | "package";
 
 export function analyzeDocument(content: string, filename: string | null) {
@@ -24,6 +29,7 @@ export function analyzeDocument(content: string, filename: string | null) {
     file: toLoadedFile(normalized, filename),
     quality: analyzeQuality(normalized),
     injection: detectInjection(normalized),
+    spec: isSkillDocumentPath(filename) ? validateSkillDocument(normalized, filename) : [],
   };
 }
 
@@ -144,6 +150,7 @@ export function analyzeReview(mode: ReviewMode, input: readonly ReviewSource[]) 
     const analysis = analyzeDocument(source.content, source.path);
     return {
       ...analysis,
+      spec: mode === "package" && !/(^|\/)SKILL\.md$/u.test(source.path) ? [] : analysis.spec,
       quality:
         mode === "package"
           ? mergeAdditionalFindings(analysis.quality, localLinks(source, files))
@@ -155,6 +162,7 @@ export function analyzeReview(mode: ReviewMode, input: readonly ReviewSource[]) 
     ruleVersion: RULE_VERSION,
     mode,
     documents,
+    spec: mode === "package" ? validateSkillPackage(sources) : [],
     comparison:
       mode === "compare"
         ? compareQualityReports(documents[0]!.quality, documents[1]!.quality)

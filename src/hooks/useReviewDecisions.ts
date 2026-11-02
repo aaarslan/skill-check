@@ -24,7 +24,8 @@ export function useReviewDecisions(review: Review | null) {
       restore: (id) => update(key(id), { status: "open", note: decisions[key(id)]?.note ?? "" }),
     };
   };
-  return { decisions, update, injectionDismissals };
+  const importAll = (next: Decisions) => setState({ review, decisions: next });
+  return { decisions, update, importAll, injectionDismissals };
 }
 
 export type ReviewDecisions = ReturnType<typeof useReviewDecisions>;

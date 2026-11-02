@@ -36,6 +36,20 @@ const PATTERNS: readonly PatternSpec[] = [
     pattern: /\bexfiltrate\b/iu,
     rationale: 'Uses the word "exfiltrate" directly.',
   },
+  {
+    pattern: /\brm\s+-[a-z]*r[a-z]*f\b|\brm\s+-[a-z]*f[a-z]*r\b/iu,
+    rationale: "Recursive forced deletion command (rm -rf).",
+    suspicion: "medium",
+  },
+  {
+    pattern: /\b(?:curl|wget)\b[^|\n]*\|\s*(?:sudo\s+)?(?:sh|bash|zsh)\b/iu,
+    rationale: "Pipes a remote download directly into a shell for execution.",
+  },
+  {
+    pattern: /\b(?:mkfs|dd\s+if=|chmod\s+(?:777|a\+rwx)|chown\s+-R\s+root|:\(\)\s*\{)/iu,
+    rationale: "Destructive or privilege-escalating shell construct.",
+    suspicion: "medium",
+  },
 ];
 
 export const systemCommandRule: InjectionRule = {

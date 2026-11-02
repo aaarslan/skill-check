@@ -6,12 +6,12 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
-  border: 1px solid #26334a;
+  border: 1px solid var(--color-border);
   border-radius: 12px;
   background:
-    radial-gradient(circle at 50% -20%, rgb(25 50 86 / 32%), transparent 45%),
-    linear-gradient(145deg, #030a16 0%, #06101e 48%, #030b17 100%);
-  box-shadow: inset 0 0 80px rgb(2 8 20 / 40%);
+    radial-gradient(circle at 50% -20%, var(--color-app-glow), transparent 45%),
+    linear-gradient(145deg, var(--color-bg) 0%, var(--color-surface) 48%, var(--color-bg) 100%);
+  box-shadow: inset 0 0 80px var(--color-scrim);
 }
 
 .workflowActions {
@@ -21,8 +21,8 @@
   margin: 14px 0;
 }
 .workflowActions [aria-pressed="true"] {
-  border-color: #7da3ff;
-  background: #18355a;
+  border-color: var(--color-accent-soft);
+  background: var(--color-pressed-bg);
 }
 .workflowActions input[type="file"] {
   max-width: 230px;
@@ -48,17 +48,17 @@
   width: 100%;
   margin-block: 8px;
   padding: 12px;
-  color: #e5edf9;
-  background: #081426;
-  border: 1px solid #52627b;
+  color: var(--color-text);
+  background: var(--color-surface-deep);
+  border: 1px solid var(--color-border-strong);
   border-radius: 8px;
   resize: vertical;
 }
 .reviewFinding select {
   padding: 8px;
-  color: #e5edf9;
-  background: #081426;
-  border: 1px solid #52627b;
+  color: var(--color-text);
+  background: var(--color-surface-deep);
+  border: 1px solid var(--color-border-strong);
   border-radius: 6px;
 }
 .results summary {
@@ -76,7 +76,7 @@
 .results td,
 .results th {
   padding: 8px;
-  border-bottom: 1px solid #334056;
+  border-bottom: 1px solid var(--color-border);
   text-align: left;
 }
 .tableScroll {
@@ -101,7 +101,7 @@
 
 .brand h1 {
   margin: 0;
-  color: #f4f7ff;
+  color: var(--color-text);
   font-size: 30px;
   line-height: 1;
   letter-spacing: -0.04em;
@@ -110,7 +110,7 @@
 .tagline {
   max-width: 520px;
   margin: 0;
-  color: #c2c8d4;
+  color: var(--color-muted);
   font-size: 14px;
   line-height: 1.55;
 }
@@ -129,7 +129,7 @@
   justify-content: center;
   gap: 10px;
   padding: 0 20px;
-  border: 1px solid #334056;
+  border: 1px solid var(--color-border);
   border-radius: 9px;
   font-weight: 650;
   text-decoration: none;
@@ -142,14 +142,14 @@
 }
 
 .secondaryAction {
-  background: rgb(19 29 45 / 78%);
-  color: #eef2fb;
+  background: var(--color-surface-raised);
+  color: var(--color-text);
 }
 
 .secondaryAction:hover {
   transform: translateY(-1px);
-  border-color: #52627b;
-  background: #172236;
+  border-color: var(--color-border-strong);
+  background: var(--color-surface-hover);
 }
 
 .disclaimer {
@@ -160,22 +160,22 @@
   align-items: center;
   gap: 20px;
   padding: 16px 20px;
-  border: 1px solid #996100;
+  border: 1px solid var(--color-warning-border);
   border-radius: 10px;
-  background: rgb(46 31 13 / 54%);
+  background: var(--color-warning-bg);
   color: var(--color-warning);
 }
 
 .disclaimer strong {
   display: block;
   margin-bottom: 3px;
-  color: #ffb82e;
+  color: var(--color-warning);
   font-size: 16px;
 }
 
 .disclaimer p {
   margin: 0;
-  color: #d1d3da;
+  color: var(--color-muted);
   font-size: 14px;
   line-height: 1.45;
 }
@@ -188,13 +188,13 @@
   border: 0;
   border-radius: 8px;
   background: transparent;
-  color: #a8adb8;
+  color: var(--color-muted);
   cursor: pointer;
 }
 
 .dismissButton:hover {
-  background: rgb(255 255 255 / 7%);
-  color: #fff;
+  background: color-mix(in srgb, var(--color-text) 8%, transparent);
+  color: var(--color-text);
 }
 
 .inputGrid {
@@ -208,8 +208,8 @@
   padding: 20px 18px 14px;
   border: 1px solid var(--color-border);
   border-radius: 11px;
-  background: linear-gradient(140deg, rgb(13 25 43 / 92%), rgb(7 17 32 / 96%));
-  box-shadow: inset 0 1px rgb(255 255 255 / 2%);
+  background: linear-gradient(140deg, var(--color-surface), var(--color-bg));
+  box-shadow: inset 0 1px color-mix(in srgb, var(--color-text) 3%, transparent);
 }
 
 .metricGrid {
@@ -227,26 +227,26 @@
   align-items: center;
   gap: 13px;
   padding: 0 18px;
-  border: 1px solid #28364c;
+  border: 1px solid var(--color-border);
   border-radius: 8px;
-  background: rgb(9 20 37 / 76%);
+  background: var(--color-surface-raised);
 }
 
 .metricIcon {
   display: grid;
-  color: #9db9ff;
+  color: var(--color-accent-soft);
 }
 
 .metricLabel {
   overflow: hidden;
-  color: #b3bac9;
+  color: var(--color-muted);
   font-size: 13px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .metricValue {
-  color: #dfe6f4;
+  color: var(--color-text);
   font-size: 15px;
   font-weight: 550;
   white-space: nowrap;
@@ -265,7 +265,7 @@
   padding: 0 15px;
   border: 0;
   background: transparent;
-  color: #afb7c6;
+  color: var(--color-muted);
   font-size: 13px;
   font-weight: 600;
   white-space: nowrap;
@@ -284,23 +284,23 @@
 }
 
 .tab[aria-selected="true"] {
-  color: #f2f5fc;
+  color: var(--color-text);
 }
 
 .tab[aria-selected="true"]::after {
-  background: #4d78ff;
+  background: var(--color-accent);
 }
 
 .tab:hover {
-  color: #fff;
+  color: var(--color-text);
 }
 
 .tabPanel {
   min-height: 214px;
   overflow: hidden;
-  border: 1px solid #27354c;
+  border: 1px solid var(--color-border);
   border-radius: 9px;
-  background: rgb(7 17 32 / 36%);
+  background: var(--color-surface-raised);
 }
 
 .analysisSection {

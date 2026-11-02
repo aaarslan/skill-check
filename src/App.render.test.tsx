@@ -44,10 +44,10 @@ describe("App", () => {
     expect(note).toHaveValue("");
   });
 
-  it("reruns package links after an edit and keeps exports available", () => {
+  it("reruns package links after an edit and keeps exports available", async () => {
     render(<App />);
     fireEvent.click(screen.getByRole("button", { name: "Review folder" }));
-    fireEvent.click(screen.getByRole("button", { name: "Try sample package" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Try sample package" }));
     expect(screen.getByRole("heading", { name: "2 files reviewed" })).toBeInTheDocument();
     expect(screen.getByText(/1 package link findings/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Edit SKILL.md" }));
@@ -57,6 +57,13 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", { name: "Apply and review package" }));
     expect(screen.queryByText(/1 package link findings/)).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Export Markdown report" })).toBeInTheDocument();
+  });
+
+  it("shows spec compliance after loading the example", () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Try review example" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Spec compliance" }));
+    expect(screen.getByText("Original: Agent Skills spec")).toBeInTheDocument();
   });
 
   it("shows quality analysis after loading only one file", () => {

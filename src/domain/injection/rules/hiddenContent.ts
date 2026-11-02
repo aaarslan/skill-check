@@ -83,6 +83,25 @@ export const hiddenContentRule: InjectionRule = {
       });
     }
 
+    const INVISIBLE =
+      /[\u{E0000}-\u{E007F}\u202A-\u202E\u2066-\u2069]|(?:\u200B|\u200C|\u200D|\uFEFF){3,}/gu;
+    doc.lines.forEach((line, index) => {
+      for (const match of line.matchAll(INVISIBLE)) {
+        findings.push({
+          id: `${RULE_ID}:${index + 1}:invisible:${match.index ?? 0}`,
+          ruleId: RULE_ID,
+          category: "hidden-content",
+          suspicion: "high",
+          matchedText: line.trim().slice(0, 80),
+          location: { line: index + 1, excerpt: line.trim().slice(0, 80) },
+          rationale:
+            "Invisible Unicode (tag characters, bidirectional controls, or zero-width runs) can hide instructions from human review while remaining readable by a model.",
+          isQuotedExample: false,
+        });
+        break;
+      }
+    });
+
     doc.lines.forEach((line, index) => {
       const lineNumber = index + 1;
       if (codeLines.has(lineNumber)) {

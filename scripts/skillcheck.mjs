@@ -2,7 +2,8 @@
 import { lstat, readdir, realpath, open, writeFile } from "node:fs/promises";
 import { resolve, relative, basename, sep } from "node:path";
 import { analyzeReview } from "../src/domain/review/analyze.ts";
-import { exportReview, markdownReport } from "../src/domain/review/report.ts";
+import { exportReview, markdownReport, sarifReport } from "../src/domain/review/report.ts";
+import { readFile } from "node:fs/promises";
 import { INPUT_LIMITS, TEXT_FILE_PATTERN } from "../src/domain/review/input.ts";
 import { evaluateCalibration } from "../src/domain/calibration/evaluate.ts";
 
@@ -11,7 +12,8 @@ const usage = `Skillcheck — local static review (Node 22.18+)
   node scripts/skillcheck.mjs --compare original.md candidate.md [options]
   node scripts/skillcheck.mjs --folder path/to/skill [options]
   node scripts/skillcheck.mjs --calibration [--output calibration.json]
-Options: --fail-on-high exits 1 if any high-suspicion finding exists.
+  cat SKILL.md | node scripts/skillcheck.mjs --stdin [--format sarif]
+Options: --fail-on-high (or --fail-on high|medium) exits 1 at/above that suspicion. --stdin reviews piped text as SKILL.md. --format json|md|sarif. --config file.json may set {"failOn":"high"|"medium"}.
 Exit codes: 0 completed; 1 requested high-suspicion gate; 2 invalid input/read error.
 No skill content is executed, imported, or sent to a service. JSON includes source text.
 `;
@@ -85,13 +87,22 @@ try {
     format = "json",
     output = null,
     failOnHigh = false,
-    calibration = false;
+    calibration = false,
+    useStdin = false,
+    failOn = null,
+    configPath = null;
   for (let index = 0; index < args.length; index++) {
     const arg = args[index];
     if (arg === "--compare" || arg === "--folder" || arg === "--calibration") {
       if (mode !== "single" || calibration) throw new Error("Choose only one review mode.");
       if (arg === "--calibration") calibration = true;
       else mode = arg === "--compare" ? "compare" : "package";
+    } else if (arg === "--stdin") useStdin = true;
+    else if (arg === "--fail-on" || arg === "--config") {
+      const value = args[++index];
+      if (!value || value.startsWith("--")) throw new Error(`Missing value for ${arg}`);
+      if (arg === "--fail-on") failOn = value;
+      else configPath = value;
     } else if (arg === "--format" || arg === "--output") {
       const value = args[++index];
       if (!value || value.startsWith("--")) throw new Error(`Missing value for ${arg}`);
@@ -101,19 +112,50 @@ try {
     else if (arg.startsWith("--")) throw new Error(`Unknown option: ${arg}`);
     else paths.push(arg);
   }
-  if (!["json", "md"].includes(format)) throw new Error("Format must be json or md.");
-  if (calibration && (paths.length || format !== "json" || failOnHigh))
+  if (!["json", "md", "sarif"].includes(format))
+    throw new Error("Format must be json, md, or sarif.");
+  if (configPath) {
+    const config = JSON.parse(await readFile(resolve(configPath), "utf8"));
+    if (
+      config &&
+      typeof config === "object" &&
+      "failOn" in config &&
+      failOn === null &&
+      !failOnHigh
+    )
+      failOn = config.failOn;
+  }
+  if (failOnHigh) failOn = "high";
+  if (failOn !== null && !["high", "medium"].includes(failOn))
+    throw new Error("--fail-on must be high or medium.");
+  if (useStdin && (calibration || mode !== "single" || paths.length))
+    throw new Error(
+      "--stdin reviews one piped file only; do not combine it with paths or other modes.",
+    );
+  if (calibration && (paths.length || format !== "json" || failOnHigh || failOn !== null))
     throw new Error(
       "Calibration accepts JSON output only, without file inputs or a high-suspicion gate.",
     );
-  if (!calibration && paths.length !== (mode === "compare" ? 2 : 1))
+  if (!calibration && !useStdin && paths.length !== (mode === "compare" ? 2 : 1))
     throw new Error("Wrong number of input paths. Use --help.");
   let text,
     hasHigh = false;
   if (calibration) text = JSON.stringify(evaluateCalibration(), null, 2);
   else {
-    const sources =
-      mode === "package"
+    let stdinText = null;
+    if (useStdin) {
+      const chunks = [];
+      let stdinBytes = 0;
+      for await (const chunk of process.stdin) {
+        stdinBytes += chunk.length;
+        if (stdinBytes > INPUT_LIMITS.fileBytes) throw new Error("Stdin exceeds 256 KiB.");
+        chunks.push(chunk);
+      }
+      stdinText = new TextDecoder("utf-8", { fatal: true }).decode(Buffer.concat(chunks));
+    }
+    const sources = useStdin
+      ? [{ path: "SKILL.md", content: stdinText }]
+      : mode === "package"
         ? await readFolder(paths[0])
         : await Promise.all(
             paths.map(async (path, index) => ({
@@ -125,18 +167,23 @@ try {
             })),
           );
     const review = analyzeReview(mode, sources);
-    hasHigh = review.documents.some((document) =>
-      document.injection.some((finding) => finding.suspicion === "high"),
-    );
+    const rank = { low: 1, medium: 2, high: 3 };
+    hasHigh =
+      failOn !== null &&
+      review.documents.some((document) =>
+        document.injection.some((finding) => rank[finding.suspicion] >= rank[failOn]),
+      );
     text =
       format === "md"
         ? markdownReport(review, {})
-        : JSON.stringify(exportReview(review, {}), null, 2);
+        : format === "sarif"
+          ? JSON.stringify(sarifReport(review, {}), null, 2)
+          : JSON.stringify(exportReview(review, {}), null, 2);
   }
   // Refuse overwrites, including accidentally choosing an input as output.
   if (output) await writeFile(resolve(output), `${text}\n`, { encoding: "utf8", flag: "wx" });
   else process.stdout.write(`${text}\n`);
-  if (failOnHigh && hasHigh) process.exitCode = 1;
+  if (hasHigh) process.exitCode = 1;
 } catch (error) {
   process.stderr.write(`Skillcheck: ${error instanceof Error ? error.message : String(error)}\n`);
   process.exitCode = 2;

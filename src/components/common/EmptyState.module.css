@@ -11,13 +11,13 @@
 
 .icon {
   margin-bottom: 9px;
-  color: #6681c8;
-  filter: drop-shadow(0 8px 18px rgb(18 47 103 / 35%));
+  color: var(--color-accent);
+  filter: drop-shadow(0 8px 18px color-mix(in srgb, var(--color-accent) 35%, transparent));
 }
 
 .title {
   margin: 0 0 5px;
-  color: #f0f3f9;
+  color: var(--color-text);
   font-size: 17px;
   font-weight: 700;
 }
@@ -25,6 +25,6 @@
 .description {
   max-width: 620px;
   margin: 0;
-  color: #a9b1c0;
+  color: var(--color-muted);
   font-size: 13px;
 }

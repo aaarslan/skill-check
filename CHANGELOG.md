@@ -18,6 +18,18 @@
 
 - `App.tsx` split into `ModePicker` and `ResultsSection` components; App now
   owns only header, disclaimer, mode state, and file inputs.
+- The published `skillcheck` binary is now a bundled JavaScript file
+  (`dist-cli/`, built by `pnpm build:cli` on pack) so it runs when installed
+  under `node_modules`, where Node cannot strip TypeScript.
+
+### Fixed (PR review)
+
+- Decision import verifies source text and finding identity, refusing
+  decisions from changed documents.
+- Quoted frontmatter scalars with trailing comments decode correctly.
+- Diff change navigation scrolls after windowed rows expand.
+- Root SKILL.md name checks use the selected folder name (CLI and browser).
+- SARIF artifact URIs map to the real reviewed files.
 
 ## 1.0.0 - 2026-11-02
 

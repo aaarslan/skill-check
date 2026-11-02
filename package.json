@@ -22,11 +22,10 @@
     "url": "https://github.com/aaarslan/skill-check.git"
   },
   "bin": {
-    "skillcheck": "scripts/skillcheck.mjs"
+    "skillcheck": "dist-cli/skillcheck.mjs"
   },
   "files": [
-    "scripts/skillcheck.mjs",
-    "src/domain",
+    "dist-cli",
     "README.md",
     "LICENSE"
   ],
@@ -37,13 +36,15 @@
     "preview": "vp preview",
     "check": "vp check",
     "test": "vp test",
-    "test:cli": "node --test scripts/skillcheck.test.mjs",
+    "test:cli": "node --test scripts/skillcheck.test.mjs scripts/packaged-cli.test.mjs",
     "review": "node scripts/skillcheck.mjs",
     "calibrate": "node scripts/skillcheck.mjs --calibration",
     "prepare": "vp config",
     "coverage": "vp test --coverage",
     "test:e2e": "node --test scripts/e2e-smoke.test.mjs",
-    "test:browser": "playwright test"
+    "test:browser": "playwright test",
+    "build:cli": "vp pack scripts/skillcheck.mjs --out-dir dist-cli --format esm --platform node",
+    "prepack": "pnpm run build:cli"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",

@@ -18,11 +18,25 @@ const EMPTY: ParsedFrontmatter = {
 
 function unquote(value: string): string {
   const trimmed = value.trim();
-  if (
-    (trimmed.startsWith('"') && trimmed.endsWith('"') && trimmed.length >= 2) ||
-    (trimmed.startsWith("'") && trimmed.endsWith("'") && trimmed.length >= 2)
-  ) {
-    return trimmed.slice(1, -1);
+  const quote = trimmed.startsWith('"') ? '"' : trimmed.startsWith("'") ? "'" : null;
+  if (quote) {
+    let index = 1;
+    while (index < trimmed.length) {
+      if (quote === '"' && trimmed[index] === "\\") {
+        index += 2;
+        continue;
+      }
+      if (trimmed[index] === quote) {
+        if (quote === "'" && trimmed[index + 1] === "'") {
+          index += 2;
+          continue;
+        }
+        const inner = trimmed.slice(1, index);
+        return quote === "'" ? inner.replace(/''/gu, "'") : inner;
+      }
+      index++;
+    }
+    return trimmed.slice(1);
   }
   return trimmed.replace(/\s+#.*$/u, "").trim();
 }

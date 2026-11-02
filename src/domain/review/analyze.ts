@@ -23,13 +23,15 @@ export const RULE_VERSION = "2026.11.02.1";
 export const REPORT_VERSION = "1.1";
 export type ReviewMode = "single" | "compare" | "package";
 
-export function analyzeDocument(content: string, filename: string | null) {
+export function analyzeDocument(content: string, filename: string | null, parentDirName?: string) {
   const normalized = validateContent(content);
   return {
     file: toLoadedFile(normalized, filename),
     quality: analyzeQuality(normalized),
     injection: detectInjection(normalized),
-    spec: isSkillDocumentPath(filename) ? validateSkillDocument(normalized, filename) : [],
+    spec: isSkillDocumentPath(filename)
+      ? validateSkillDocument(normalized, filename, parentDirName)
+      : [],
   };
 }
 
@@ -135,7 +137,16 @@ function localLinks(
 }
 
 /** Shared browser/CLI entrypoint. Text is data; this module performs no I/O. */
-export function analyzeReview(mode: ReviewMode, input: readonly ReviewSource[]) {
+export interface AnalyzeOptions {
+  /** Selected folder name, used only to check a root SKILL.md name against its directory. */
+  readonly packageRootName?: string | undefined;
+}
+
+export function analyzeReview(
+  mode: ReviewMode,
+  input: readonly ReviewSource[],
+  options: AnalyzeOptions = {},
+) {
   const sources = prepareSources(input);
   if (mode === "single" && sources.length !== 1)
     throw new Error("One-file review requires exactly one file.");
@@ -147,7 +158,12 @@ export function analyzeReview(mode: ReviewMode, input: readonly ReviewSource[]) 
       ? input.map((source) => files.get(normalizePackagePath(source.path))!)
       : sources;
   const documents = ordered.map((source) => {
-    const analysis = analyzeDocument(source.content, source.path);
+    const atPackageRoot = mode === "package" && !source.path.includes("/");
+    const analysis = analyzeDocument(
+      source.content,
+      source.path,
+      atPackageRoot ? options.packageRootName : undefined,
+    );
     return {
       ...analysis,
       spec: mode === "package" && !/(^|\/)SKILL\.md$/u.test(source.path) ? [] : analysis.spec,

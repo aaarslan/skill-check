@@ -9,6 +9,7 @@ import {
 
 export function usePackageLoader() {
   const [sources, setSources] = useState<readonly ReviewSource[]>([]);
+  const [rootName, setRootName] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const generation = useRef(0);
@@ -20,6 +21,7 @@ export function usePackageLoader() {
   );
   const replace = useCallback((input: readonly ReviewSource[]) => {
     generation.current++;
+    setRootName("");
     setLoading(false);
     try {
       setSources(prepareSources(input));
@@ -30,6 +32,7 @@ export function usePackageLoader() {
   }, []);
   const clear = useCallback(() => {
     generation.current++;
+    setRootName("");
     setSources([]);
     setError("");
     setLoading(false);
@@ -70,7 +73,10 @@ export function usePackageLoader() {
         }),
       );
       const prepared = prepareSources(loaded);
-      if (current === generation.current) setSources(prepared);
+      if (current === generation.current) {
+        setRootName(strip && root ? root : "");
+        setSources(prepared);
+      }
     } catch (cause) {
       if (current === generation.current)
         setError(cause instanceof Error ? cause.message : "Could not read package.");
@@ -78,5 +84,5 @@ export function usePackageLoader() {
       if (current === generation.current) setLoading(false);
     }
   }, []);
-  return { sources, error, loading, load, replace, clear };
+  return { sources, rootName, error, loading, load, replace, clear };
 }

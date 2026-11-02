@@ -21,6 +21,23 @@ describe("DiffViewer", () => {
     expect(screen.queryByText(/Showing the first 600 of/u)).not.toBeInTheDocument();
   });
 
+  it("scrolls to a windowed-out change after expanding rows", async () => {
+    const scroll = vi.fn();
+    HTMLElement.prototype.scrollIntoView = scroll;
+    window.matchMedia = vi.fn().mockReturnValue({ matches: true });
+    const original = Array.from({ length: 700 }, (_, i) => `line ${i}`).join("\n");
+    const candidate = original.replace("line 650", "CHANGED 650");
+    render(
+      <DiffViewer
+        diff={diffLines(original, candidate)}
+        ignoreWhitespace={false}
+        onIgnoreWhitespaceChange={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Next change" }));
+    await vi.waitFor(() => expect(scroll).toHaveBeenCalled());
+  });
+
   it("announces identical files", () => {
     const diff = diffLines("same", "same");
     render(<DiffViewer diff={diff} ignoreWhitespace={false} onIgnoreWhitespaceChange={vi.fn()} />);

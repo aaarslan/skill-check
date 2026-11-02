@@ -9,7 +9,9 @@ import styles from "../App.module.css";
 export function PackageReview() {
   const loader = usePackageLoader();
   const deferredSources = useDeferredValue(loader.sources);
-  const report = useAsyncReview("package", deferredSources);
+  const report = useAsyncReview("package", deferredSources, {
+    packageRootName: loader.rootName || undefined,
+  });
   const [draft, setDraft] = useState<{ path: string; content: string } | null>(null);
   const workflow = useReviewDecisions(report);
   return (

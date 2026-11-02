@@ -43,7 +43,11 @@ export function isSkillDocumentPath(path: string | null): boolean {
   return /(^|\/)SKILL\.md$/u.test(path) || /\.(md|markdown)$/iu.test(path);
 }
 
-export function validateSkillDocument(content: string, path: string | null): SpecFinding[] {
+export function validateSkillDocument(
+  content: string,
+  path: string | null,
+  parentDirName?: string,
+): SpecFinding[] {
   const out: SpecFinding[] = [];
   const fm = parseFrontmatter(content);
   const lineOf = (key: string) => fm.fieldLines[key] ?? 1;
@@ -127,7 +131,7 @@ export function validateSkillDocument(content: string, path: string | null): Spe
           name,
         ),
       );
-    const parent = path?.split("/").slice(-2, -1)[0];
+    const parent = parentDirName ?? path?.split("/").slice(-2, -1)[0];
     const isWrapper = parent === "original" || parent === "candidate";
     if (parent && !isWrapper && /(^|\/)SKILL\.md$/u.test(path ?? "") && parent !== name)
       out.push(

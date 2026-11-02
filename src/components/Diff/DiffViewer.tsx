@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   buildSideBySideRows,
   findChangeGroups,
@@ -39,15 +39,24 @@ export function DiffViewer({ diff, ignoreWhitespace, onIgnoreWhitespaceChange }:
     }
   }, []);
 
+  const pendingScrollRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const startIndex = pendingScrollRef.current;
+    if (startIndex === null) return;
+    const element = rowRefs.current.get(startIndex);
+    if (!element) return;
+    pendingScrollRef.current = null;
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    element.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "center" });
+  });
+
   const goToGroup = (index: number) => {
-    setShowAllRows(true);
-    setCurrentChangeIndex(index);
     const group = groups[index];
+    setCurrentChangeIndex(index);
     if (group) {
-      const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-      rowRefs.current
-        .get(group.startIndex)
-        ?.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "center" });
+      pendingScrollRef.current = group.startIndex;
+      setShowAllRows(true);
     }
   };
 

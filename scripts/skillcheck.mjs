@@ -8,11 +8,11 @@ import { INPUT_LIMITS, TEXT_FILE_PATTERN } from "../src/domain/review/input.ts";
 import { evaluateCalibration } from "../src/domain/calibration/evaluate.ts";
 
 const usage = `Skillcheck — local static review (Node 22.18+)
-  node scripts/skillcheck.mjs SKILL.md [--format json|md] [--output report.json]
-  node scripts/skillcheck.mjs --compare original.md candidate.md [options]
-  node scripts/skillcheck.mjs --folder path/to/skill [options]
-  node scripts/skillcheck.mjs --calibration [--output calibration.json]
-  cat SKILL.md | node scripts/skillcheck.mjs --stdin [--format sarif]
+  skillcheck SKILL.md [--format json|md] [--output report.json]
+  skillcheck --compare original.md candidate.md [options]
+  skillcheck --folder path/to/skill [options]
+  skillcheck --calibration [--output calibration.json]
+  cat SKILL.md | skillcheck --stdin [--format sarif]
 Options: --fail-on-high (or --fail-on high|medium) exits 1 at/above that suspicion. --stdin reviews piped text as SKILL.md. --format json|md|sarif. --config file.json may set {"failOn":"high"|"medium"}.
 Exit codes: 0 completed; 1 requested high-suspicion gate; 2 invalid input/read error.
 No skill content is executed, imported, or sent to a service. JSON includes source text.
@@ -68,7 +68,7 @@ async function readFolder(folder) {
         const content = await readText(full, root);
         totalBytes += Buffer.byteLength(content);
         if (totalBytes > INPUT_LIMITS.packageBytes) throw new Error("Package exceeds 2 MiB.");
-        sources.push({ path: relative(root, full).split(sep).join("/"), content });
+        sources.push({ path: relative(root, full).split(sep).join("/"), content, realPath: full });
       }
     }
   }
@@ -153,8 +153,8 @@ try {
       }
       stdinText = new TextDecoder("utf-8", { fatal: true }).decode(Buffer.concat(chunks));
     }
-    const sources = useStdin
-      ? [{ path: "SKILL.md", content: stdinText }]
+    const loaded = useStdin
+      ? [{ path: "SKILL.md", content: stdinText, realPath: null }]
       : mode === "package"
         ? await readFolder(paths[0])
         : await Promise.all(
@@ -164,9 +164,23 @@ try {
                   ? `${index === 0 ? "original" : "candidate"}/${basename(path)}`
                   : basename(path),
               content: await readText(resolve(path)),
+              realPath: resolve(path),
             })),
           );
-    const review = analyzeReview(mode, sources);
+    const sources = loaded.map(({ path, content }) => ({ path, content }));
+    const toUri = (absolute) =>
+      relative(process.cwd(), absolute)
+        .split(sep)
+        .map((segment) =>
+          segment === ".." || segment === "." ? segment : encodeURIComponent(segment),
+        )
+        .join("/");
+    const artifactUris = Object.fromEntries(
+      loaded.filter((s) => s.realPath).map((s) => [s.path, toUri(s.realPath)]),
+    );
+    const packageRootName =
+      mode === "package" ? basename(await realpath(resolve(paths[0]))) : undefined;
+    const review = analyzeReview(mode, sources, { packageRootName });
     const rank = { low: 1, medium: 2, high: 3 };
     hasHigh =
       failOn !== null &&
@@ -177,7 +191,7 @@ try {
       format === "md"
         ? markdownReport(review, {})
         : format === "sarif"
-          ? JSON.stringify(sarifReport(review, {}), null, 2)
+          ? JSON.stringify(sarifReport(review, {}, artifactUris), null, 2)
           : JSON.stringify(exportReview(review, {}), null, 2);
   }
   // Refuse overwrites, including accidentally choosing an input as output.

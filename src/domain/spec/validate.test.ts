@@ -20,6 +20,29 @@ describe("parseFrontmatter", () => {
     );
     expect(fm.fields["description"]).toContain("Does things. Use when needed.");
   });
+  it("decodes quoted scalars with trailing comments and keeps hashes inside quotes", () => {
+    const fm = parseFrontmatter(
+      "---\nname: \"demo\" # directory name\ndescription: 'Use when # tagging.' # note\n---\n",
+    );
+    expect(fm.fields["name"]).toBe("demo");
+    expect(fm.fields["description"]).toBe("Use when # tagging.");
+    expect(
+      validateSkillDocument(
+        '---\nname: "demo" # directory name\ndescription: Helps. Use when demoing.\n---\n',
+        "demo/SKILL.md",
+      ),
+    ).toEqual([]);
+  });
+  it("checks a root SKILL.md against the selected folder name", () => {
+    const doc = "---\nname: demo\ndescription: Helps. Use when demoing.\n---\n# Demo\n";
+    expect(validateSkillDocument(doc, "SKILL.md")).toEqual([]);
+    expect(
+      validateSkillDocument(doc, "SKILL.md", "wrong-name").some(
+        (f) => f.ruleId === "spec/name-directory-mismatch",
+      ),
+    ).toBe(true);
+    expect(validateSkillDocument(doc, "SKILL.md", "demo")).toEqual([]);
+  });
   it("reports missing frontmatter", () => {
     expect(parseFrontmatter("# Hi\n").present).toBe(false);
   });

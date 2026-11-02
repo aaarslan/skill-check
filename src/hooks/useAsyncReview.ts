@@ -1,5 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { analyzeReview, type Review, type ReviewMode } from "../domain/review/analyze.ts";
+import {
+  analyzeReview,
+  type AnalyzeOptions,
+  type Review,
+  type ReviewMode,
+} from "../domain/review/analyze.ts";
 import type { ReviewSource } from "../domain/review/input.ts";
 
 interface WorkerResponse {
@@ -48,54 +53,68 @@ function getWorker(): Worker | null {
 export function analyzeReviewAsync(
   mode: ReviewMode,
   sources: readonly ReviewSource[],
+  options: AnalyzeOptions = {},
 ): Promise<Review> {
   const active = getWorker();
-  if (!active) return Promise.resolve().then(() => analyzeReview(mode, sources));
+  if (!active) return Promise.resolve().then(() => analyzeReview(mode, sources, options));
   const id = nextRequestId++;
   return new Promise<Review>((resolvePromise, rejectPromise) => {
     pending.set(id, {
       resolve: resolvePromise,
       reject: (cause) => {
         try {
-          resolvePromise(analyzeReview(mode, sources));
+          resolvePromise(analyzeReview(mode, sources, options));
         } catch {
           rejectPromise(cause);
         }
       },
     });
-    active.postMessage({ id, mode, sources });
+    active.postMessage({ id, mode, sources, options });
   });
 }
 
-export function useAsyncReview(mode: ReviewMode, sources: readonly ReviewSource[]): Review | null {
+export function useAsyncReview(
+  mode: ReviewMode,
+  sources: readonly ReviewSource[],
+  options: AnalyzeOptions = {},
+): Review | null {
+  const { packageRootName } = options;
+  const stableOptions = useMemo<AnalyzeOptions>(
+    () => (packageRootName ? { packageRootName } : {}),
+    [packageRootName],
+  );
   const signature = useMemo(
-    () => sources.map((source) => `${source.path}\0${source.content}`).join("\0"),
-    [sources],
+    () =>
+      `${options.packageRootName ?? ""}\0${sources.map((source) => `${source.path}\0${source.content}`).join("\0")}`,
+    [sources, options.packageRootName],
   );
   const syncFallback = useMemo(
-    () => (typeof Worker === "undefined" && sources.length ? analyzeReview(mode, sources) : null),
-    [mode, sources],
+    () =>
+      typeof Worker === "undefined" && sources.length
+        ? analyzeReview(mode, sources, stableOptions)
+        : null,
+    [mode, sources, stableOptions],
   );
   const [state, setState] = useState<{ signature: string; review: Review } | null>(null);
 
   useEffect(() => {
     if (!sources.length || typeof Worker === "undefined") return;
     let cancelled = false;
-    void analyzeReviewAsync(mode, sources)
+    void analyzeReviewAsync(mode, sources, stableOptions)
       .then((review) => {
         if (!cancelled) setState({ signature, review });
       })
       .catch(() => {
         if (!cancelled) {
           try {
-            setState({ signature, review: analyzeReview(mode, sources) });
+            setState({ signature, review: analyzeReview(mode, sources, stableOptions) });
           } catch {}
         }
       });
     return () => {
       cancelled = true;
     };
-  }, [mode, sources, signature]);
+  }, [mode, sources, signature, stableOptions]);
 
   if (!sources.length) return null;
   if (syncFallback) return syncFallback;

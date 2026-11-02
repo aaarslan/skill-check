@@ -126,7 +126,11 @@ const SARIF_LEVEL: Record<string, string> = {
   info: "note",
 };
 
-export function sarifReport(review: Review, decisions: Decisions) {
+export function sarifReport(
+  review: Review,
+  decisions: Decisions,
+  artifactUris: Readonly<Record<string, string>> = {},
+) {
   const exported = exportReview(review, decisions);
   const ruleIds = [...new Set(exported.findings.map((finding) => finding.rule))].sort();
   return {
@@ -153,12 +157,16 @@ export function sarifReport(review: Review, decisions: Decisions) {
           locations: [
             {
               physicalLocation: {
-                artifactLocation: { uri: finding.path },
+                artifactLocation: { uri: artifactUris[finding.path] ?? finding.path },
                 region: { startLine: Math.max(1, finding.line ?? 1) },
               },
             },
           ],
-          properties: { decision: finding.decision.status, level: finding.level },
+          properties: {
+            decision: finding.decision.status,
+            level: finding.level,
+            "skillcheck/reportPath": finding.path,
+          },
         })),
       },
     ],
@@ -174,16 +182,62 @@ export function importDecisions(jsonText: string, review: Review): Decisions {
   }
   if (!parsed || typeof parsed !== "object")
     throw new Error("Report file is not a Skillcheck report.");
-  const candidate = parsed as { schemaVersion?: unknown; findings?: unknown };
+  const candidate = parsed as {
+    schemaVersion?: unknown;
+    findings?: unknown;
+    documents?: unknown;
+  };
   if (typeof candidate.schemaVersion !== "string" || !candidate.schemaVersion.startsWith("1."))
     throw new Error("Unsupported report schema; expected a 1.x Skillcheck report.");
   if (!Array.isArray(candidate.findings)) throw new Error("Report has no findings array.");
-  const validIds = new Set(reviewFindings(review).map((finding) => finding.id));
+  if (candidate.findings.length === 0) return {};
+  // Finding ids are only path+kind+index, so a matching id does not prove the
+  // finding is the same one. Require the imported report to carry the exact
+  // sources it was produced from and refuse decisions for changed documents.
+  if (!Array.isArray(candidate.documents))
+    throw new Error(
+      "Report does not include its source documents, so decisions cannot be verified against the current files.",
+    );
+  const importedSources = new Map<string, string>();
+  for (const entry of candidate.documents) {
+    if (!entry || typeof entry !== "object") continue;
+    const file = (entry as { file?: { filename?: unknown; content?: unknown } }).file;
+    if (typeof file?.content === "string")
+      importedSources.set(
+        typeof file.filename === "string" ? file.filename : "SKILL.md",
+        file.content,
+      );
+  }
+  for (const document of review.documents) {
+    const path = document.file.filename ?? "SKILL.md";
+    if (importedSources.get(path) !== document.file.content)
+      throw new Error(
+        "Report was produced from different source text; decisions are not imported for changed documents.",
+      );
+  }
+  const current = new Map(
+    reviewFindings(review).map((finding) => [
+      finding.id,
+      `${finding.rule}\u0000${finding.line ?? ""}\u0000${finding.level}\u0000${finding.message}`,
+    ]),
+  );
   const decisions: Record<string, FindingDecision> = {};
   for (const entry of candidate.findings) {
     if (!entry || typeof entry !== "object") continue;
-    const finding = entry as { id?: unknown; decision?: { status?: unknown; note?: unknown } };
-    if (typeof finding.id !== "string" || !validIds.has(finding.id)) continue;
+    const finding = entry as {
+      id?: unknown;
+      rule?: unknown;
+      line?: unknown;
+      level?: unknown;
+      message?: unknown;
+      decision?: { status?: unknown; note?: unknown };
+    };
+    if (typeof finding.id !== "string") continue;
+    if (typeof finding.rule !== "string" || typeof finding.message !== "string") continue;
+    if (typeof finding.level !== "string") continue;
+    if (finding.line !== null && typeof finding.line !== "number") continue;
+    const identity = `${finding.rule}\u0000${finding.line ?? ""}\u0000${finding.level}\u0000${finding.message}`;
+    if (current.get(finding.id) !== identity) continue;
     const status = finding.decision?.status;
     if (status !== "open" && status !== "reviewed" && status !== "dismissed") continue;
     decisions[finding.id] = {

@@ -16,5 +16,11 @@ export default defineConfig({
     include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
     environment: "jsdom",
     setupFiles: ["./src/test/setup.ts"],
+    coverage: {
+      provider: "v8",
+      include: ["src/**/*.{ts,tsx}"],
+      exclude: ["src/**/*.test.{ts,tsx}", "src/test/**", "src/domain/review/analysisWorker.ts"],
+      thresholds: { statements: 85, branches: 73, functions: 80, lines: 86 },
+    },
   },
 });

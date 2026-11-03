@@ -4,7 +4,7 @@ import type { QualityFinding, QualityRule } from "../types.ts";
 
 // URL group tolerates one level of nested parens (e.g. javascript:alert(1)) and an
 // empty target (`]()`), instead of stopping at the first ")" and requiring 1+ chars.
-const LINK_PATTERN = /\[([^\]]*)\]\(((?:[^()]|\([^()]*\))*)\)/gu;
+const LINK_PATTERN = /\[([^\]]{0,500})\]\(((?:[^()]|\([^()]{0,1000}\)){0,1000})\)/gu;
 
 const brokenRelativeLinks: QualityRule = {
   id: "integrity/broken-relative-links",
@@ -21,6 +21,7 @@ const brokenRelativeLinks: QualityRule = {
       if (codeLines.has(lineNumber)) {
         return;
       }
+      if (!line.includes("](")) return;
       for (const match of line.matchAll(LINK_PATTERN)) {
         const target = (match[2] ?? "").trim();
 
@@ -62,8 +63,8 @@ const brokenRelativeLinks: QualityRule = {
   },
 };
 
-const REFERENCE_LINK_PATTERN = /\[([^\]]+)\]\[([^\]]*)\]/gu;
-const REFERENCE_DEFINITION_PATTERN = /^[ \t]{0,3}\[([^\]]+)\]:\s*\S+/u;
+const REFERENCE_LINK_PATTERN = /\[([^\]]{1,500})\]\[([^\]]{0,500})\]/gu;
+const REFERENCE_DEFINITION_PATTERN = /^[ \t]{0,3}\[([^\]]{1,500})\]:\s*\S+/u;
 
 const undefinedReferenceLinks: QualityRule = {
   id: "integrity/undefined-reference-link",
@@ -89,6 +90,7 @@ const undefinedReferenceLinks: QualityRule = {
       if (codeLines.has(lineNumber)) {
         return;
       }
+      if (!line.includes("][")) return;
       for (const match of line.matchAll(REFERENCE_LINK_PATTERN)) {
         const linkText = match[1] ?? "";
         const explicitRef = (match[2] ?? "").trim();

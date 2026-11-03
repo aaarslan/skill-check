@@ -89,6 +89,71 @@ export function isLikelyQuotedContext(
   return QUOTING_CUE.test(contextWindow);
 }
 
+/**
+ * Per-line prepared form of isLikelyQuotedContext. Inline-code spans, quote
+ * spans, and quoting-cue positions are computed once per line instead of per
+ * match, so patterns with thousands of hits on one long line stay linear.
+ * The returned checker answers the same question for each span on the line.
+ */
+export function prepareQuotedChecker(
+  doc: AnalyzableDocument,
+  lineNumber: number,
+  codeLines: ReadonlySet<number>,
+): (matchStart: number, matchLength: number) => boolean {
+  const line = doc.lines[lineNumber - 1] ?? "";
+  if (codeLines.has(lineNumber) || /^\s*>/u.test(line)) {
+    return () => true;
+  }
+  const inlineSpans: { start: number; end: number; innerStart: number; innerEnd: number }[] = [];
+  for (const match of line.matchAll(INLINE_CODE)) {
+    const start = match.index ?? 0;
+    inlineSpans.push({
+      start,
+      end: start + match[0].length,
+      innerStart: start + 1,
+      innerEnd: start + match[0].length - 1,
+    });
+  }
+  const quoteSpans: { start: number; end: number }[] = [];
+  for (const [open, close] of QUOTE_PAIRS) {
+    let searchFrom = 0;
+    while (searchFrom < line.length) {
+      const openIndex = line.indexOf(open, searchFrom);
+      if (openIndex < 0) break;
+      const closeIndex = line.indexOf(close, openIndex + open.length);
+      if (closeIndex < 0) break;
+      quoteSpans.push({ start: openIndex + open.length, end: closeIndex });
+      searchFrom = closeIndex + close.length;
+    }
+  }
+  const previousLines = doc.lines.slice(Math.max(0, lineNumber - 4), lineNumber - 1).join(" ");
+  const cueText = `${previousLines} ${stripInlineCode(line)}`;
+  const cueGlobal = new RegExp(QUOTING_CUE.source, "giu");
+  const cueEnds = [...cueText.matchAll(cueGlobal)].map(
+    (match) => (match.index ?? 0) + match[0].length,
+  );
+  const cueBaseLength = previousLines.length + 1;
+  const strippedIndex = (rawPos: number) => {
+    let removed = 0;
+    for (const span of inlineSpans) {
+      if (span.end <= rawPos) removed += span.end - span.start;
+      else if (span.start < rawPos) removed += rawPos - span.start;
+      else break;
+    }
+    return rawPos - removed;
+  };
+  return (matchStart, matchLength) => {
+    for (const span of inlineSpans) {
+      if (spanIsInsideRange(matchStart, matchLength, span.innerStart, span.innerEnd)) return true;
+    }
+    for (const span of quoteSpans) {
+      if (spanIsInsideRange(matchStart, matchLength, span.start, span.end)) return true;
+    }
+    const windowEnd = cueBaseLength + strippedIndex(Math.max(0, matchStart));
+    return cueEnds.some((end) => end <= windowEnd);
+  };
+}
+
 /** Drops suspicion by one tier when the match is a quoted example rather than a live instruction. */
 export function downgradeIfQuoted(base: Suspicion, quoted: boolean): Suspicion {
   return quoted ? downgradeSuspicionTier(base) : base;

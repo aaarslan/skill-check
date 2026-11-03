@@ -107,16 +107,28 @@ paths, shorthand Markdown references, and non-text dependencies are not resolved
 
 The **Review findings and keep a record** panel records open/reviewed/dismissed
 decisions and notes. Decisions do not alter scores and reset when analyzed text
-changes. Exports contain applied content only. JSON schema `1.0` includes normalized
+changes. Exports contain applied content only. JSON schema `1.1` (1.0 reports remain importable for decisions) includes normalized
 source, complete analysis, rule version, limitations, and decisions; Markdown is
 a readable summary without source text. Review exported text before sharing it.
 Comparison reports include a line diff with whitespace significant, independent
 of display filters. Injection-panel dismissals and report decisions share state.
 
-### 5. Inspectable calibration
+### 5. Agent Skills spec compliance
 
-The app includes 21 author-labeled synthetic cases (`synthetic-1.0`) covering all
-ten categories, benign guidance, quoted examples, and obfuscation. Expand
+The **Spec compliance** tab (and `spec/*` findings in every report) checks a
+SKILL.md against the [Agent Skills specification](https://agentskills.io/specification):
+YAML frontmatter presence, `name` charset/length/hyphen rules and directory
+match, `description` presence and 1024-character limit, `compatibility` length,
+unknown top-level fields, and progressive-disclosure body length. Folder review
+adds package checks such as a missing SKILL.md. Spec findings are separate from
+the quality score, so score comparisons across versions stay legible.
+
+### 6. Inspectable calibration
+
+The app includes 63 author-labeled synthetic cases (`synthetic-2.0`): a 21-case
+dev split used while tuning rules and a 42-case held-out split that was not used
+to tune the 2026.11 pattern additions. The calibration table reports held-out
+rates; both splits remain small and not independently adjudicated. Expand
 **Inspect calibration** for source text, label rationale, predictions, false
 positives, and misses. A positive prediction means medium or high suspicion;
 metrics are per document/category. False-positive rates use negative examples;
@@ -158,8 +170,15 @@ node scripts/skillcheck.mjs path/to/SKILL.md
 node scripts/skillcheck.mjs --compare before.md after.md --format md
 node scripts/skillcheck.mjs --folder path/to/skill --output review.json
 node scripts/skillcheck.mjs --calibration --output calibration.json
+cat SKILL.md | node scripts/skillcheck.mjs --stdin --format sarif
 node --test scripts/skillcheck.test.mjs
 ```
+
+`--format sarif` emits SARIF 2.1.0 for code-scanning tools. `--fail-on high|medium`
+generalizes `--fail-on-high`, and `--config skillcheck.config.json` may set
+`{"failOn": "high"}`. The package also installs a `skillcheck` binary with the
+same interface. In the browser, JSON (decisions), Markdown, and SARIF exports are
+available, and decisions from a previous 1.x JSON report can be imported back.
 
 Output files must not already exist, preventing accidental source/report overwrites.
 For CI, check out a pinned Skillcheck revision and run the same command against
@@ -169,10 +188,10 @@ your selected skill folder:
 node scripts/skillcheck.mjs --folder path/to/skill --fail-on-high --output review.json
 ```
 
-Exit `0` means analysis completed, `1` means the explicitly requested high-suspicion
-gate found a match, and `2` means invalid input or an I/O error. Store the report as
+Exit `0` means analysis completed, `1` means the explicitly requested suspicion
+gate found a match at or above its level, and `2` means invalid input or an I/O error. Store the report as
 an artifact even when the gate fails. This optional gate is a review signal, not a
-safety clearance; without `--fail-on-high`, findings do not change the exit status.
+safety clearance; without a fail-on gate, findings do not change the exit status.
 
 ### Other commands
 
@@ -180,7 +199,10 @@ safety clearance; without `--fail-on-high`, findings do not change the exit stat
 pnpm build       # type-check and produce a production build in dist/
 pnpm preview     # serve the production build locally
 pnpm check       # format, lint, and type-check (Oxfmt + Oxlint + tsc)
-pnpm test        # run the Vitest suite
+pnpm test        # Vitest suite plus the CLI and packaged-CLI suites
+pnpm coverage    # Vitest with V8 coverage thresholds (85/73/80/86)
+pnpm test:e2e    # build, preview, and smoke-test the served app shell
+pnpm test:browser # Playwright suite in system Chrome (all modes, both themes)
 ```
 
 This project uses [Vite+](https://viteplus.dev), a unified toolchain. The

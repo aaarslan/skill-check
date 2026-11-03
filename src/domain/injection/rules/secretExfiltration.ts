@@ -1,5 +1,5 @@
 import type { AnalyzableDocument } from "../../shared/markdown.ts";
-import { scanPatterns, type PatternSpec } from "../scanPatterns.ts";
+import { scanCrossLinePatterns, scanPatterns, type PatternSpec } from "../scanPatterns.ts";
 import type { InjectionFinding, InjectionRule } from "../types.ts";
 
 const RULE_ID = "injection/secret-exfiltration";
@@ -34,6 +34,9 @@ export const secretExfiltrationRule: InjectionRule = {
   description:
     "Detects requests to reveal secrets, credentials, system prompts, or hidden context.",
   evaluate(doc: AnalyzableDocument): InjectionFinding[] {
-    return scanPatterns(doc, RULE_ID, "secret-exfiltration", "high", PATTERNS);
+    return [
+      ...scanPatterns(doc, RULE_ID, "secret-exfiltration", "high", PATTERNS),
+      ...scanCrossLinePatterns(doc, RULE_ID, "secret-exfiltration", "high", PATTERNS),
+    ];
   },
 };

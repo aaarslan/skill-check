@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   buildSideBySideRows,
   findChangeGroups,
@@ -19,7 +19,10 @@ interface DiffViewerProps {
 export function DiffViewer({ diff, ignoreWhitespace, onIgnoreWhitespaceChange }: DiffViewerProps) {
   const [viewMode, setViewMode] = useState<DiffViewMode>("side-by-side");
   const [currentChangeIndex, setCurrentChangeIndex] = useState(-1);
+  const [showAllRows, setShowAllRows] = useState(false);
+  const [scrollRequest, setScrollRequest] = useState(0);
   const rowRefs = useRef(new Map<number, HTMLElement>());
+  const scrollAreaRef = useRef<HTMLDivElement | null>(null);
 
   const sideBySideRows = useMemo(() => buildSideBySideRows(diff), [diff]);
   const groups = useMemo(
@@ -38,14 +41,32 @@ export function DiffViewer({ diff, ignoreWhitespace, onIgnoreWhitespaceChange }:
     }
   }, []);
 
+  const pendingScrollRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    setCurrentChangeIndex(-1);
+    setShowAllRows(false);
+    pendingScrollRef.current = null;
+  }, [diff]);
+
+  useEffect(() => {
+    if (scrollRequest === 0) return;
+    const startIndex = pendingScrollRef.current;
+    if (startIndex === null) return;
+    const element = rowRefs.current.get(startIndex);
+    if (!element) return;
+    pendingScrollRef.current = null;
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    element.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "center" });
+  }, [scrollRequest, showAllRows, viewMode]);
+
   const goToGroup = (index: number) => {
-    setCurrentChangeIndex(index);
     const group = groups[index];
+    setCurrentChangeIndex(index);
     if (group) {
-      const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-      rowRefs.current
-        .get(group.startIndex)
-        ?.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "center" });
+      pendingScrollRef.current = group.startIndex;
+      setShowAllRows(true);
+      setScrollRequest((value) => value + 1);
     }
   };
 
@@ -98,13 +119,41 @@ export function DiffViewer({ diff, ignoreWhitespace, onIgnoreWhitespaceChange }:
         onPrevChange={handlePrevChange}
         onNextChange={handleNextChange}
       />
-      <div className={styles.scrollArea}>
-        {viewMode === "unified" ? (
-          <UnifiedDiff lines={diff.lines} registerRowRef={registerRowRef} />
-        ) : (
-          <SideBySideDiff rows={sideBySideRows} registerRowRef={registerRowRef} />
-        )}
-      </div>
+      {(() => {
+        const rowCount = viewMode === "unified" ? diff.lines.length : sideBySideRows.length;
+        const windowed = !showAllRows && rowCount > 600;
+        return (
+          <>
+            {windowed && (
+              <p role="status">
+                Showing the first 600 of {rowCount} rows to keep the review responsive.{" "}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAllRows(true);
+                    scrollAreaRef.current?.focus();
+                  }}
+                >
+                  Show all rows
+                </button>
+              </p>
+            )}
+            <div className={styles.scrollArea} ref={scrollAreaRef} tabIndex={-1}>
+              {viewMode === "unified" ? (
+                <UnifiedDiff
+                  lines={windowed ? diff.lines.slice(0, 600) : diff.lines}
+                  registerRowRef={registerRowRef}
+                />
+              ) : (
+                <SideBySideDiff
+                  rows={windowed ? sideBySideRows.slice(0, 600) : sideBySideRows}
+                  registerRowRef={registerRowRef}
+                />
+              )}
+            </div>
+          </>
+        );
+      })()}
     </section>
   );
 }

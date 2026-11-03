@@ -72,7 +72,7 @@ describe("input lifecycle", () => {
       await result.current.load([file]);
     });
     expect(read).toBe(false);
-    expect(result.current.error).toContain("supported text");
+    expect(result.current.error).toContain("between 1 and 100 text files");
   });
   it("rejects malformed UTF-8 before package analysis", async () => {
     const { result } = renderHook(() => usePackageLoader());
@@ -106,5 +106,77 @@ describe("input lifecycle", () => {
     expect(result.current.state.status === "loaded" && result.current.state.file.content).toBe(
       "# Good\nText",
     );
+  });
+});
+
+describe("usePackageLoader root context", () => {
+  it("preserves rootName only when a replacement provides it", () => {
+    const { result } = renderHook(() => usePackageLoader());
+    act(() => result.current.replace([{ path: "SKILL.md", content: "# A" }], "my-skill"));
+    expect(result.current.rootName).toBe("my-skill");
+    act(() =>
+      result.current.replace([{ path: "SKILL.md", content: "# B" }], result.current.rootName),
+    );
+    expect(result.current.rootName).toBe("my-skill");
+    act(() => result.current.replace([{ path: "SKILL.md", content: "# C" }]));
+    expect(result.current.rootName).toBe("");
+  });
+});
+
+describe("failed loads preserve the last good state (bug hunt)", () => {
+  it("keeps the loaded file when pasted text is invalid", () => {
+    const { result } = renderHook(() => useFileLoader());
+    act(() => result.current.loadFromText("# Good\nContent."));
+    expect(result.current.state.status).toBe("loaded");
+    act(() => result.current.loadFromText("x\n".repeat(4001)));
+    expect(result.current.state.status).toBe("error");
+    if (result.current.state.status === "error") {
+      expect(result.current.state.file?.content).toContain("# Good");
+    }
+  });
+  it("keeps package sources when a later folder load fails", async () => {
+    const { result } = renderHook(() => usePackageLoader());
+    const good = {
+      name: "SKILL.md",
+      webkitRelativePath: "demo/SKILL.md",
+      size: 6,
+      arrayBuffer: async () => new TextEncoder().encode("# Demo").buffer,
+    } as File;
+    await act(async () => {
+      await result.current.load([good]);
+    });
+    expect(result.current.sources).toHaveLength(1);
+    const broken = {
+      name: "broken.md",
+      webkitRelativePath: "demo/broken.md",
+      size: 3,
+      arrayBuffer: async () => new Uint8Array([0xff, 0xfe, 0xff]).buffer,
+    } as File;
+    await act(async () => {
+      await result.current.load([broken]);
+    });
+    expect(result.current.error).toContain("valid UTF-8");
+    expect(result.current.sources).toHaveLength(1);
+  });
+  it("skips hidden and dependency entries in a selected folder", async () => {
+    const { result } = renderHook(() => usePackageLoader());
+    const make = (path: string) =>
+      ({
+        name: path.split("/").at(-1),
+        webkitRelativePath: path,
+        size: 6,
+        arrayBuffer: async () => new TextEncoder().encode("# Demo").buffer,
+      }) as File;
+    await act(async () => {
+      await result.current.load([
+        make("demo/SKILL.md"),
+        make("demo/.git/config.md"),
+        make("demo/node_modules/pkg/readme.md"),
+        make("demo/LICENSE"),
+        make("demo/asset.zip"),
+      ]);
+    });
+    expect(result.current.error).toBe("");
+    expect(result.current.sources.map((s) => s.path)).toEqual(["SKILL.md"]);
   });
 });

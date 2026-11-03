@@ -3,10 +3,23 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/skillcheck.svg" />
+    <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#030a15" />
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f4f6fa" />
     <meta
       name="description"
       content="Skillcheck compares two LLM skill Markdown files, diffs them, scores their quality, and flags potential prompt-injection patterns entirely in your browser."
+    />
+    <meta property="og:title" content="Skillcheck" />
+    <meta
+      property="og:description"
+      content="Local, deterministic review of Agent Skills: diff, quality scoring, spec compliance, and prompt-injection signals. No uploads."
+    />
+    <meta property="og:type" content="website" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' ws://localhost:* ws://127.0.0.1:*; object-src 'none'; base-uri 'self'; form-action 'self'"
     />
     <title>Skillcheck</title>
   </head>

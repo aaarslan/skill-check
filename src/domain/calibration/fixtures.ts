@@ -1,15 +1,16 @@
 import type { InjectionCategory } from "../injection/types.ts";
 
-export const CORPUS_VERSION = "synthetic-1.0";
+export const CORPUS_VERSION = "synthetic-2.0";
 export interface CalibrationFixture {
   readonly id: string;
   readonly kind: "benign" | "instruction" | "quoted" | "obfuscated";
   readonly content: string;
   readonly expected: readonly InjectionCategory[];
   readonly rationale: string;
+  readonly split?: "dev" | "heldout";
 }
 
-/** Author-labeled synthetic examples, not held-out data or measured agent behavior. */
+/** Dev-split author-labeled synthetic examples used while tuning rules. Held-out cases live in heldout.ts and were not used to tune the 2026.11 pattern additions. Neither split is independently adjudicated or representative. */
 export const CALIBRATION_FIXTURES: readonly CalibrationFixture[] = [
   {
     id: "benign-review",

@@ -23,8 +23,9 @@ export function validateContent(content: string): string {
     throw new Error("Each file must be at most 256 KiB.");
   const normalized = normalizeContent(content);
   if (normalized.includes("\0")) throw new Error("Binary content is not supported.");
-  if (normalized.split("\n").length > INPUT_LIMITS.lines)
-    throw new Error("Each file must have at most 4,000 lines.");
+  const lineCount =
+    normalized === "" ? 0 : normalized.split("\n").length - (normalized.endsWith("\n") ? 1 : 0);
+  if (lineCount > INPUT_LIMITS.lines) throw new Error("Each file must have at most 4,000 lines.");
   return normalized;
 }
 

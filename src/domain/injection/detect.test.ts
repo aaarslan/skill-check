@@ -181,7 +181,7 @@ describe("detectInjection", () => {
       (f) => f.category === "instruction-override" && f.id.includes("cross-line"),
     );
     expect(crossLineFindings).toHaveLength(1);
-    expect(crossLineFindings[0]?.id).toContain("cross-line-2");
+    expect(crossLineFindings[0]?.id).toMatch(/cross-line-\d+-2$/u);
   });
 
   it("does not treat a phrase split across fenced-code lines as a live injection", () => {

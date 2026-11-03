@@ -1,6 +1,7 @@
-import { useMemo } from "react";
+import { useDeferredValue, useMemo } from "react";
 import { compareQualityReports, type QualityComparison } from "../domain/quality/compare.ts";
-import { analyzeReview, type Review } from "../domain/review/analyze.ts";
+import type { Review } from "../domain/review/analyze.ts";
+import { useAsyncReview } from "./useAsyncReview.ts";
 import { diffLines } from "../domain/diff/diffLines.ts";
 import type { DiffResult } from "../domain/diff/types.ts";
 import { useFileLoader, type FileLoaderApi } from "./useFileLoader.ts";
@@ -22,16 +23,19 @@ export interface SkillCheckAnalysis {
   readonly candidate: FileLoaderApi;
   readonly view: AnalysisView;
   readonly report: Review | null;
+  readonly analyzing: boolean;
 }
 
 /** Revisions are independent documents; only package review resolves sibling links. */
 export function useSkillCheckAnalysis(ignoreWhitespace: boolean): SkillCheckAnalysis {
   const original = useFileLoader();
   const candidate = useFileLoader();
-  const originalFile = original.state.status === "loaded" ? original.state.file : null;
-  const candidateFile = candidate.state.status === "loaded" ? candidate.state.file : null;
-  const report = useMemo(() => {
-    const sources = [
+  const loadedOriginal = original.state.status === "idle" ? null : original.state.file;
+  const loadedCandidate = candidate.state.status === "idle" ? null : candidate.state.file;
+  const originalFile = useDeferredValue(loadedOriginal);
+  const candidateFile = useDeferredValue(loadedCandidate);
+  const sources = useMemo(
+    () => [
       ...(originalFile
         ? [
             {
@@ -48,11 +52,13 @@ export function useSkillCheckAnalysis(ignoreWhitespace: boolean): SkillCheckAnal
             },
           ]
         : []),
-    ];
-    return sources.length
-      ? analyzeReview(sources.length === 2 ? "compare" : "single", sources)
-      : null;
-  }, [originalFile, candidateFile]);
+    ],
+    [originalFile, candidateFile],
+  );
+  const { review: report, pending } = useAsyncReview(
+    sources.length === 2 ? "compare" : "single",
+    sources,
+  );
   const diff = useMemo(
     () =>
       originalFile && candidateFile
@@ -78,5 +84,5 @@ export function useSkillCheckAnalysis(ignoreWhitespace: boolean): SkillCheckAnal
       ? { kind: "original-only", original: first }
       : { kind: "candidate-only", candidate: first };
   }, [report, originalFile, candidateFile, diff]);
-  return { original, candidate, view, report };
+  return { original, candidate, view, report, analyzing: pending };
 }

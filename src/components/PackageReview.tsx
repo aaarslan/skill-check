@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { analyzeReview } from "../domain/review/analyze.ts";
+import { useDeferredValue, useState } from "react";
+import { useAsyncReview } from "../hooks/useAsyncReview.ts";
 import { SAMPLE_PACKAGE } from "../domain/review/samples.ts";
 import { usePackageLoader } from "../hooks/usePackageLoader.ts";
 import { useReviewDecisions } from "../hooks/useReviewDecisions.ts";
@@ -8,10 +8,10 @@ import styles from "../App.module.css";
 
 export function PackageReview() {
   const loader = usePackageLoader();
-  const report = useMemo(
-    () => (loader.sources.length ? analyzeReview("package", loader.sources) : null),
-    [loader.sources],
-  );
+  const deferredSources = useDeferredValue(loader.sources);
+  const { review: report, pending } = useAsyncReview("package", deferredSources, {
+    packageRootName: loader.rootName || undefined,
+  });
   const [draft, setDraft] = useState<{ path: string; content: string } | null>(null);
   const workflow = useReviewDecisions(report);
   return (
@@ -62,10 +62,20 @@ export function PackageReview() {
         </button>
       </div>
       {loader.loading && <p role="status">Reading selected text files…</p>}
+      {pending && <p role="status">Analyzing…</p>}
       {loader.error && <p role="alert">{loader.error}</p>}
       {report && (
         <>
           <h3>{report.documents.length} files reviewed</h3>
+          {report.spec.length > 0 && (
+            <ul>
+              {report.spec.map((f, specIndex) => (
+                <li key={`${specIndex}:${f.ruleId}:${f.message}`}>
+                  <strong>Spec:</strong> {f.message} — {f.suggestion}
+                </li>
+              ))}
+            </ul>
+          )}
           {!loader.sources.some((source) => /(^|\/)SKILL\.md$/u.test(source.path)) && (
             <p role="status">No SKILL.md was selected. This review covers only the listed files.</p>
           )}
@@ -88,7 +98,7 @@ export function PackageReview() {
                     finding.ruleId.startsWith("package/"),
                   ).length
                 }{" "}
-                package link findings
+                package link findings · {document.spec.length} spec findings
               </li>
             ))}
           </ul>
@@ -107,6 +117,7 @@ export function PackageReview() {
                 onClick={() =>
                   loader.replace(
                     loader.sources.map((source) => (source.path === draft.path ? draft : source)),
+                    loader.rootName,
                   )
                 }
               >

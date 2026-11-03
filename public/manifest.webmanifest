@@ -1,0 +1,10 @@
+{
+  "name": "Skillcheck",
+  "short_name": "Skillcheck",
+  "description": "Local, deterministic review of Agent Skills: diff, quality, spec compliance, and prompt-injection signals.",
+  "start_url": "/",
+  "display": "standalone",
+  "theme_color": "#030a15",
+  "background_color": "#030a15",
+  "icons": [{ "src": "/skillcheck.svg", "type": "image/svg+xml", "sizes": "any" }]
+}

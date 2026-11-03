@@ -55,6 +55,8 @@ function jaccard(a: ReadonlySet<string>, b: ReadonlySet<string>): number {
 
 interface ImperativeClause {
   readonly line: number;
+  readonly start: number;
+  readonly end: number;
   readonly excerpt: string;
   readonly keywords: ReadonlySet<string>;
 }
@@ -81,13 +83,18 @@ const conflictingImperatives: QualityRule = {
       for (const match of stripped.matchAll(NEGATIVE_PATTERN)) {
         negatives.push({
           line: lineNumber,
+          start: match.index ?? 0,
+          end: (match.index ?? 0) + match[0].length,
           excerpt: match[0].trim(),
           keywords: keywordsOf(match[1] ?? ""),
         });
       }
       for (const match of stripped.matchAll(AFFIRMATIVE_PATTERN)) {
+        if (/^must\s+not\b/iu.test(match[0])) continue;
         affirmatives.push({
           line: lineNumber,
+          start: match.index ?? 0,
+          end: (match.index ?? 0) + match[0].length,
           excerpt: match[0].trim(),
           keywords: keywordsOf(match[1] ?? ""),
         });
@@ -98,7 +105,7 @@ const conflictingImperatives: QualityRule = {
     const reportedPairs = new Set<string>();
     for (const pos of affirmatives) {
       for (const neg of negatives) {
-        if (pos.line === neg.line) {
+        if (pos.line === neg.line && pos.start === neg.start) {
           continue;
         }
         const pairKey = `${pos.line}:${neg.line}`;
@@ -177,7 +184,7 @@ const NUMBER_WORDS: Record<string, number> = {
   ten: 10,
 };
 const COUNT_CLAIM =
-  /\b(?:the following|these|following)\s+(one|two|three|four|five|six|seven|eight|nine|ten|\d+)\s+(steps|rules|items|points|principles|categories|phases|stages)\b/iu;
+  /\b(?:the following|these|following|there are)\s+(one|two|three|four|five|six|seven|eight|nine|ten|\d+)\s+(steps|rules|items|points|principles|categories|phases|stages|commands|examples|options|fields|checks|actions)\b/iu;
 const LIST_ITEM_PATTERN = /^\s*(?:[-*+]|\d+[.)])\s+/u;
 
 const internalInconsistency: QualityRule = {

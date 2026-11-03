@@ -16,6 +16,17 @@
   --color-danger: #ff717d;
   --color-warning: #ffb52b;
   --color-info: #68a3ff;
+  --color-border-strong: #52627b;
+  --color-surface-deep: #081426;
+  --color-surface-hover: #172236;
+  --color-pressed-bg: #18355a;
+  --color-accent-soft: #9db9ff;
+  --color-candidate: #a762f2;
+  --color-success: #65d4a0;
+  --color-warning-border: #996100;
+  --color-warning-bg: rgb(46 31 13 / 54%);
+  --color-app-glow: rgb(25 50 86 / 32%);
+  --color-scrim: rgb(2 8 20 / 40%);
 
   --radius-sm: 7px;
   --radius-md: 10px;
@@ -38,6 +49,39 @@
   accent-color: var(--color-accent);
 }
 
+@media (prefers-color-scheme: light) {
+  :root {
+    color-scheme: light;
+
+    --color-bg: #f4f6fa;
+    --color-surface: #ffffff;
+    --color-surface-raised: #eef1f7;
+    --color-border: #c3ccd9;
+    --color-text: #17202e;
+    --color-muted: #4d5a6e;
+    --color-accent: #2f5fe8;
+    --color-accent-contrast: #fff;
+    --color-added-bg: #dcf2e6;
+    --color-added-text: #14663c;
+    --color-removed-bg: #fbe3e6;
+    --color-removed-text: #a81f2d;
+    --color-danger: #c22430;
+    --color-warning: #8a5a00;
+    --color-info: #2456c4;
+    --color-border-strong: #8b99af;
+    --color-surface-deep: #ffffff;
+    --color-surface-hover: #e4eaf3;
+    --color-pressed-bg: #d3e0fa;
+    --color-accent-soft: #2456c4;
+    --color-candidate: #7a3fd1;
+    --color-success: #14663c;
+    --color-warning-border: #c48a12;
+    --color-warning-bg: #fdf3d8;
+    --color-app-glow: rgb(47 95 232 / 10%);
+    --color-scrim: rgb(23 32 46 / 8%);
+  }
+}
+
 *,
 *::before,
 *::after {
@@ -46,14 +90,14 @@
 
 html {
   min-width: 320px;
-  background: #020812;
+  background: var(--color-bg);
   scroll-behavior: smooth;
 }
 
 body {
   min-height: 100vh;
   margin: 0;
-  background: #020812;
+  background: var(--color-bg);
   color: var(--color-text);
   font-family: var(--font-sans);
   line-height: 1.5;
@@ -87,12 +131,12 @@ kbd {
 }
 
 :focus-visible {
-  outline: 2px solid #6d91ff;
+  outline: 2px solid var(--color-accent-soft);
   outline-offset: 3px;
 }
 
 ::selection {
-  background: rgb(77 120 255 / 38%);
+  background: color-mix(in srgb, var(--color-accent) 38%, transparent);
 }
 
 @media (prefers-reduced-motion: reduce) {

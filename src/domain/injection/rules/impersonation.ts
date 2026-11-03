@@ -1,5 +1,5 @@
 import type { AnalyzableDocument } from "../../shared/markdown.ts";
-import { scanPatterns, type PatternSpec } from "../scanPatterns.ts";
+import { scanCrossLinePatterns, scanPatterns, type PatternSpec } from "../scanPatterns.ts";
 import type { InjectionFinding, InjectionRule } from "../types.ts";
 
 const RULE_ID = "injection/impersonation";
@@ -24,6 +24,19 @@ const PATTERNS: readonly PatternSpec[] = [
     pattern: /\bacting as (?:the )?(?:system|developer|admin)\b/iu,
     rationale: "Explicitly claims to act as a privileged role.",
   },
+  {
+    pattern: /\byou are now (?:the )?(?:system|developer|administrator|admin)\b/iu,
+    rationale: "Reassigns the reader to a privileged system/developer/administrator role.",
+  },
+  {
+    pattern: /\bthis is an? (?:system|developer|admin) message\b/iu,
+    rationale: "Claims the message itself originates from a privileged role.",
+  },
+  {
+    pattern: /\b(?:message|instruction) (?:with|at) (?:the )?highest priority\b/iu,
+    rationale: "Claims highest-priority authority for an unprivileged document.",
+    suspicion: "medium",
+  },
 ];
 
 export const impersonationRule: InjectionRule = {
@@ -32,6 +45,9 @@ export const impersonationRule: InjectionRule = {
   description:
     "Detects attempts to impersonate system, developer, administrator, or tool messages.",
   evaluate(doc: AnalyzableDocument): InjectionFinding[] {
-    return scanPatterns(doc, RULE_ID, "impersonation", "high", PATTERNS);
+    return [
+      ...scanPatterns(doc, RULE_ID, "impersonation", "high", PATTERNS),
+      ...scanCrossLinePatterns(doc, RULE_ID, "impersonation", "high", PATTERNS),
+    ];
   },
 };

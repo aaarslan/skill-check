@@ -14,13 +14,22 @@ const MAX_FRAME_GAP = 40;
  * execute...") rather than a direct, active instruction to the reader.
  */
 export function isDescriptiveFraming(line: string, matchIndex: number): boolean {
-  const prefix = line.slice(0, matchIndex);
-  const match = DESCRIPTIVE_FRAME.exec(prefix);
-  if (!match) {
-    return false;
+  // A frame can only qualify when it ends within MAX_FRAME_GAP of the match,
+  // and frames are short, so only the trailing window of the prefix can
+  // contain one. Searching that window keeps long lines linear instead of
+  // rescanning (and copying) the whole prefix per match. Any frame ending in
+  // the window qualifies, not only the first frame in the full prefix.
+  const windowStart = Math.max(0, matchIndex - (MAX_FRAME_GAP + 80));
+  const window = line.slice(windowStart, matchIndex);
+  const frames = new RegExp(DESCRIPTIVE_FRAME.source, "giu");
+  for (const match of window.matchAll(frames)) {
+    const frameEnd = windowStart + (match.index ?? 0) + match[0].length;
+    const gap = matchIndex - frameEnd;
+    if (gap >= 0 && gap <= MAX_FRAME_GAP) {
+      return true;
+    }
   }
-  const gap = matchIndex - (match.index + match[0].length);
-  return gap >= 0 && gap <= MAX_FRAME_GAP;
+  return false;
 }
 
 /** Drops suspicion by one tier when the match reads as descriptive rather than a live directive. */

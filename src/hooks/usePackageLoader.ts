@@ -9,6 +9,7 @@ import {
 
 export function usePackageLoader() {
   const [sources, setSources] = useState<readonly ReviewSource[]>([]);
+  const [rootName, setRootName] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const generation = useRef(0);
@@ -18,8 +19,9 @@ export function usePackageLoader() {
     },
     [],
   );
-  const replace = useCallback((input: readonly ReviewSource[]) => {
+  const replace = useCallback((input: readonly ReviewSource[], nextRootName = "") => {
     generation.current++;
+    setRootName(nextRootName);
     setLoading(false);
     try {
       setSources(prepareSources(input));
@@ -30,6 +32,7 @@ export function usePackageLoader() {
   }, []);
   const clear = useCallback(() => {
     generation.current++;
+    setRootName("");
     setSources([]);
     setError("");
     setLoading(false);
@@ -38,25 +41,29 @@ export function usePackageLoader() {
     const current = ++generation.current;
     setLoading(true);
     setError("");
-    setSources([]);
     try {
-      if (!files.length || files.length > INPUT_LIMITS.files)
+      const kept = files.filter((file) => {
+        const segments = (file.webkitRelativePath || file.name).split("/");
+        return (
+          TEXT_FILE_PATTERN.test(file.name) &&
+          !segments
+            .slice(segments.length > 1 ? 1 : 0)
+            .some((segment) => segment.startsWith(".") || segment === "node_modules")
+        );
+      });
+      if (!kept.length || kept.length > INPUT_LIMITS.files)
         throw new Error("Choose between 1 and 100 text files.");
       if (
-        files.some((file) => file.size > INPUT_LIMITS.fileBytes) ||
-        files.reduce((sum, file) => sum + file.size, 0) > INPUT_LIMITS.packageBytes
+        kept.some((file) => file.size > INPUT_LIMITS.fileBytes) ||
+        kept.reduce((sum, file) => sum + file.size, 0) > INPUT_LIMITS.packageBytes
       )
         throw new Error("Limit: 256 KiB per file and 2 MiB per package.");
-      if (files.some((file) => !TEXT_FILE_PATTERN.test(file.name)))
-        throw new Error(
-          "Choose a folder containing only supported text files. Remove binary assets, archives, and dependency folders first.",
-        );
       // Folder pickers include the selected root. Strip only a verified common root.
-      const relative = files.map((file) => file.webkitRelativePath || file.name);
+      const relative = kept.map((file) => file.webkitRelativePath || file.name);
       const root = relative[0]?.split("/")[0];
       const strip = relative.every((path) => path.includes("/") && path.split("/")[0] === root);
       const loaded = await Promise.all(
-        files.map(async (file, index) => {
+        kept.map(async (file, index) => {
           let content: string;
           try {
             content = decodeUtf8(await file.arrayBuffer());
@@ -70,7 +77,10 @@ export function usePackageLoader() {
         }),
       );
       const prepared = prepareSources(loaded);
-      if (current === generation.current) setSources(prepared);
+      if (current === generation.current) {
+        setRootName(strip && root ? root : "");
+        setSources(prepared);
+      }
     } catch (cause) {
       if (current === generation.current)
         setError(cause instanceof Error ? cause.message : "Could not read package.");
@@ -78,5 +88,5 @@ export function usePackageLoader() {
       if (current === generation.current) setLoading(false);
     }
   }, []);
-  return { sources, error, loading, load, replace, clear };
+  return { sources, rootName, error, loading, load, replace, clear };
 }

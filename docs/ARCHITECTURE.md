@@ -13,6 +13,9 @@ src/
     diff/        Line diff and view construction.
     quality/     Deterministic quality scoring.
     injection/   Prompt-injection pattern detection.
+    spec/        Agent Skills specification compliance (frontmatter + layout).
+    review/      Shared browser/CLI entrypoint, input limits, portable reports.
+    calibration/ Labeled synthetic corpus (dev + held-out splits) and metrics.
     shared/      Markdown helpers and cross-cutting types.
   hooks/         React state and the wiring between domain functions.
   components/    Presentational UI, grouped by feature area.
@@ -56,6 +59,22 @@ prevents a single noisy file from flooding one category. `suspicion.ts` assigns
 the final high/medium/low level. `taxonomy.ts` holds the typed category and
 suspicion enumerations so ordering never depends on object-key iteration.
 
+### `domain/spec`
+
+`frontmatter.ts` is a bounded YAML-subset parser (scalar and folded/literal
+block values plus a `metadata:` map) with no dependency. `validate.ts` checks
+one SKILL.md against the Agent Skills specification and, at package level,
+checks SKILL.md presence. Findings use `spec/*` rule ids, ride along in review
+reports and SARIF, and deliberately do not change quality scores.
+
+### `domain/review` and `domain/calibration`
+
+`analyzeReview` is the one pure entrypoint shared by browser and CLI; it owns
+report schema 1.1 and the rule version. `report.ts` renders JSON, Markdown,
+and SARIF 2.1.0, and re-imports decisions from 1.x JSON reports. Calibration
+keeps a dev split (used while tuning) separate from a held-out split; metrics
+in the UI are held-out only.
+
 ## Hooks
 
 - `useFileLoader` manages one file slot (idle, loading, loaded, error) from
@@ -69,20 +88,40 @@ suspicion enumerations so ordering never depends on object-key iteration.
   quality and injection panels.
 - `useDismissedFindings` tracks which injection findings the user has triaged
   away.
+- `useReviewDecisions` owns open/reviewed/dismissed decisions shared by the
+  injection panels and report workflow, including decision import.
+- `usePackageLoader` reads a selected folder as bounded inert text sources.
+  Analysis inputs pass through `useDeferredValue` so typing and file edits
+  stay responsive ahead of recomputation.
+- `useAsyncReview` runs `analyzeReview` in a shared Web Worker
+  (`domain/review/analysisWorker.ts`) keyed by a source signature, falling
+  back to exact synchronous analysis when Workers are unavailable or fail;
+  the worker entry is exercised by the browser suite and excluded from unit
+  coverage.
 
 ## Components
 
-Grouped by feature: `Diff`, `Quality`, `Injection`, plus `FileInput`,
-`Filters`, and small shared pieces (`common/EmptyState`, `SeverityBadge`).
-Presentational components receive plain data and render it. State and analysis
-live in the hooks above.
+`App.tsx` is a thin shell over `ModePicker` and `ResultsSection`. Other
+components are grouped by feature: `Diff`, `Quality`, `Injection`, `Spec`, plus `FileInput`,
+`Filters`, and small shared pieces (`common/EmptyState`, `common/ErrorBoundary`,
+`SeverityBadge`). Presentational components receive plain data and render it.
+State and analysis live in the hooks above. Diff, folder review, and
+calibration panels are lazy-loaded chunks; diff tables window to 600 rows with
+an explicit show-all control.
 
 ## Testing
 
 Because the domain is pure, tests call functions directly with input strings
-and assert on returned data. Component behavior that matters (finding lists) has
-focused render tests. The suite runs on Vitest with jsdom. Run it with
-`pnpm test`.
+and assert on returned data, including seeded property tests that reconstruct
+both documents from generated diffs. Component behavior that matters (finding
+lists, the full App flows) has render tests, and an axe wcag2a/2aa pass guards
+the initial screen against serious accessibility violations. The CLI has its
+own `node:test` suite including browser/CLI parity, an E2E smoke test builds, previews, and fetches the served shell, and a
+Playwright suite (`pnpm test:browser`, system Chrome) drives all three modes
+in a real browser through the Worker path, in both color schemes with
+screenshots, plus a mobile viewport. The palette is fully variable-driven,
+so dark remains default and light follows `prefers-color-scheme`. Coverage thresholds
+(statements 85, branches 73, functions 80, lines 86) run via `pnpm coverage`.
 
 ## Conventions
 

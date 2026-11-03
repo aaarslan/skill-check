@@ -16,6 +16,11 @@ describe("calibration accounting", () => {
       "instruction-override",
     );
     expect(result.cases.some((item) => item.falsePositives.length)).toBe(true);
+    expect(result.splitCounts.dev + result.splitCounts.heldout).toBe(result.cases.length);
+    expect(result.splitCounts.heldout).toBeGreaterThan(result.splitCounts.dev);
+    for (const category of result.splits.heldout) {
+      expect(category.positives + category.negatives).toBe(result.splitCounts.heldout);
+    }
     expect(result).toEqual(evaluateCalibration());
   });
   it("represents an empty denominator as unavailable", () => {

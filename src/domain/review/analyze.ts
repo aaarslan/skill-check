@@ -13,17 +13,25 @@ import {
   type ReviewSource,
 } from "./input.ts";
 import type { QualityFinding } from "../quality/types.ts";
+import {
+  isSkillDocumentPath,
+  validateSkillDocument,
+  validateSkillPackage,
+} from "../spec/validate.ts";
 
-export const RULE_VERSION = "2026.09.12.1";
-export const REPORT_VERSION = "1.0";
+export const RULE_VERSION = "2026.11.02.1";
+export const REPORT_VERSION = "1.1";
 export type ReviewMode = "single" | "compare" | "package";
 
-export function analyzeDocument(content: string, filename: string | null) {
+export function analyzeDocument(content: string, filename: string | null, parentDirName?: string) {
   const normalized = validateContent(content);
   return {
     file: toLoadedFile(normalized, filename),
     quality: analyzeQuality(normalized),
     injection: detectInjection(normalized),
+    spec: isSkillDocumentPath(filename)
+      ? validateSkillDocument(normalized, filename, parentDirName)
+      : [],
   };
 }
 
@@ -50,15 +58,21 @@ function localLinks(
   const findings: QualityFinding[] = [];
   const definitions = new Map<string, string>();
   for (const line of doc.lines) {
-    const definition = /^\s{0,3}\[([^\]]+)\]:\s*<?([^\s>]+)>?/u.exec(line);
+    const definition = /^\s{0,3}\[([^\]]{1,500})\]:\s*<?([^\s>]{1,1000})>?/u.exec(line);
     if (definition) definitions.set((definition[1] ?? "").toLowerCase(), definition[2] ?? "");
   }
   doc.lines.forEach((line, index) => {
     if (code.has(index + 1)) return;
     const targets = [
-      ...line.matchAll(/\[[^\]]*\]\(\s*(?:<([^>]+)>|([^\s)]+))(?:\s+"[^"]*")?\s*\)/gu),
+      ...(line.includes("](")
+        ? line.matchAll(
+            /\[[^\]]{0,500}\]\(\s*(?:<([^>]{1,1000})>|([^\s)]{1,1000}))(?:\s+"[^"]{0,200}")?\s*\)/gu,
+          )
+        : []),
     ].map((m) => ({ target: m[1] ?? m[2] ?? "", excerpt: m[0] }));
-    for (const match of line.matchAll(/\[([^\]]+)\]\[([^\]]*)\]/gu)) {
+    for (const match of line.includes("][")
+      ? line.matchAll(/\[([^\]]{1,500})\]\[([^\]]{0,500})\]/gu)
+      : []) {
       const label = (match[2] || match[1] || "").toLowerCase();
       const target = definitions.get(label);
       if (target) targets.push({ target, excerpt: match[0] });
@@ -129,7 +143,16 @@ function localLinks(
 }
 
 /** Shared browser/CLI entrypoint. Text is data; this module performs no I/O. */
-export function analyzeReview(mode: ReviewMode, input: readonly ReviewSource[]) {
+export interface AnalyzeOptions {
+  /** Selected folder name, used only to check a root SKILL.md name against its directory. */
+  readonly packageRootName?: string | undefined;
+}
+
+export function analyzeReview(
+  mode: ReviewMode,
+  input: readonly ReviewSource[],
+  options: AnalyzeOptions = {},
+) {
   const sources = prepareSources(input);
   if (mode === "single" && sources.length !== 1)
     throw new Error("One-file review requires exactly one file.");
@@ -141,9 +164,15 @@ export function analyzeReview(mode: ReviewMode, input: readonly ReviewSource[]) 
       ? input.map((source) => files.get(normalizePackagePath(source.path))!)
       : sources;
   const documents = ordered.map((source) => {
-    const analysis = analyzeDocument(source.content, source.path);
+    const atPackageRoot = mode === "package" && !source.path.includes("/");
+    const analysis = analyzeDocument(
+      source.content,
+      source.path,
+      atPackageRoot ? options.packageRootName : undefined,
+    );
     return {
       ...analysis,
+      spec: mode === "package" && !/(^|\/)SKILL\.md$/u.test(source.path) ? [] : analysis.spec,
       quality:
         mode === "package"
           ? mergeAdditionalFindings(analysis.quality, localLinks(source, files))
@@ -155,6 +184,7 @@ export function analyzeReview(mode: ReviewMode, input: readonly ReviewSource[]) 
     ruleVersion: RULE_VERSION,
     mode,
     documents,
+    spec: mode === "package" ? validateSkillPackage(sources) : [],
     comparison:
       mode === "compare"
         ? compareQualityReports(documents[0]!.quality, documents[1]!.quality)

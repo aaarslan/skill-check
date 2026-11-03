@@ -144,6 +144,9 @@ export function parseFrontmatter(content: string): ParsedFrontmatter {
       blockKey = null;
       pendingBlanks = 0;
     }
+    if (line.trim().startsWith("#")) {
+      continue;
+    }
     if (inMetadata && /^\s+\S/u.test(line)) {
       const m = /^\s+([^:]+):\s*(.*)$/u.exec(line);
       if (m) metadata[(m[1] ?? "").trim()] = unquote(m[2] ?? "").value;
@@ -155,14 +158,19 @@ export function parseFrontmatter(content: string): ParsedFrontmatter {
     inMetadata = false;
     if (plainKey && /^\s+\S/u.test(line)) {
       const prior = fields[plainKey] ?? "";
-      fields[plainKey] = prior ? `${prior} ${line.trim()}` : line.trim();
+      const appended = line
+        .trim()
+        .replace(/\s+#.*$/u, "")
+        .trim();
+      fields[plainKey] = prior ? `${prior} ${appended}` : appended;
       continue;
     }
     plainKey = null;
     const m = /^(?:"([^"]+)"|'([^']+)'|([A-Za-z][\w-]*))\s*:\s*(.*)$/u.exec(line);
     if (!m) continue;
     const key = m[1] ?? m[2] ?? m[3] ?? "";
-    const raw = (m[4] ?? "").trim();
+    const rawValue = (m[4] ?? "").trim();
+    const raw = rawValue.startsWith("#") ? "" : rawValue;
     fieldLines[key] = i + 1;
     if (key === "metadata" && raw === "") {
       inMetadata = true;
@@ -185,7 +193,50 @@ export function parseFrontmatter(content: string): ParsedFrontmatter {
     const decoded = unquote(raw);
     fields[key] = decoded.value;
     if (decoded.invalid) invalidFields.push(key);
-    if (!quote && NON_STRING_SCALAR.test(decoded.value)) nonStringFields.push(key);
+    if (
+      !quote &&
+      (NON_STRING_SCALAR.test(decoded.value) ||
+        decoded.value.startsWith("[") ||
+        decoded.value.startsWith("{"))
+    )
+      nonStringFields.push(key);
+    if (raw === "" && !quote && key !== "metadata") {
+      let next = i + 1;
+      while (next < lines.length) {
+        const peeked = lines[next] ?? "";
+        if (peeked.trim() === "" || peeked.trim().startsWith("#")) {
+          next++;
+          continue;
+        }
+        break;
+      }
+      const peeked = lines[next] ?? "";
+      if (
+        /^\s+\S/u.test(peeked) &&
+        (/^\s+-(?:\s|$)/u.test(peeked) ||
+          /^\s+(?:"[^"]+"|'[^']+'|[A-Za-z][\w-]*)\s*:/u.test(peeked))
+      ) {
+        nonStringFields.push(key);
+        fields[key] = "";
+        plainKey = null;
+        let end = next;
+        while (end < lines.length) {
+          const consumed = lines[end] ?? "";
+          if (/^(---|\.\.\.)\s*$/u.test(consumed)) break;
+          if (consumed.trim() === "" || consumed.trim().startsWith("#")) {
+            end++;
+            continue;
+          }
+          if (/^\s+\S/u.test(consumed)) {
+            end++;
+            continue;
+          }
+          break;
+        }
+        i = end - 1;
+        continue;
+      }
+    }
     plainKey = quote ? null : key;
   }
   return {

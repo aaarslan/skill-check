@@ -167,3 +167,72 @@ describe("YAML scalar fidelity", () => {
     expect(rules).not.toContain("spec/description-too-long");
   });
 });
+
+describe("YAML collections in string fields", () => {
+  it("flags flow collections as non-string fields", () => {
+    for (const description of ["[Use, when, demoing]", "{a: b}"]) {
+      const rules = validateSkillDocument(
+        `---\nname: demo\ndescription: ${description}\n---\n`,
+        "SKILL.md",
+      ).map((f) => f.ruleId);
+      expect(rules).toContain("spec/non-string-field");
+    }
+    expect(
+      validateSkillDocument(
+        "---\nname: [demo]\ndescription: Helps. Use when demoing.\n---\n",
+        "SKILL.md",
+      ).map((f) => f.ruleId),
+    ).toContain("spec/non-string-field");
+  });
+  it("flags block collections without leaking items into the field", () => {
+    const sequence = "---\nname: demo\ndescription:\n  - Use when demoing\n---\n";
+    const parsedSequence = parseFrontmatter(sequence);
+    expect(parsedSequence.nonStringFields).toContain("description");
+    expect(parsedSequence.fields["description"] ?? "").not.toContain("Use when demoing");
+    expect(validateSkillDocument(sequence, "SKILL.md").map((f) => f.ruleId)).toContain(
+      "spec/non-string-field",
+    );
+    const mapping = "---\nname: demo\ndescription:\n  trigger: Use when demoing\n---\n";
+    expect(parseFrontmatter(mapping).nonStringFields).toContain("description");
+    expect(validateSkillDocument(mapping, "SKILL.md").map((f) => f.ruleId)).toContain(
+      "spec/non-string-field",
+    );
+  });
+});
+
+describe("YAML comments in frontmatter", () => {
+  it("ignores an indented comment after a scalar field", () => {
+    const doc =
+      "---\nname: demo\n  # Human-readable name\ndescription: Helps. Use when demoing.\n---\n";
+    expect(parseFrontmatter(doc).fields["name"]).toBe("demo");
+    expect(validateSkillDocument(doc, "demo/SKILL.md")).toEqual([]);
+  });
+  it("joins plain-scalar continuations across comment-only lines", () => {
+    expect(
+      parseFrontmatter(
+        "---\nname: demo\ndescription: Helps with demos\n  # why this matters\n  and examples. Use when needed.\n---\n",
+      ).fields["description"],
+    ).toBe("Helps with demos and examples. Use when needed.");
+    expect(
+      parseFrontmatter(
+        "---\nname: demo\ndescription: Helps with demos\n  and examples. Use when needed. # note\n---\n",
+      ).fields["description"],
+    ).toBe("Helps with demos and examples. Use when needed.");
+  });
+  it("preserves comment lines inside literal block scalars", () => {
+    expect(
+      parseFrontmatter(
+        "---\nname: demo\ndescription: |\n  Use when demoing.\n  # why this matters\n  Second line.\n---\n",
+      ).fields["description"],
+    ).toContain("# why this matters");
+  });
+});
+
+describe("comment-only field values", () => {
+  it("treats a value that is only a comment as empty and joins the continuation", () => {
+    const fm = parseFrontmatter(
+      "---\nname: demo\ndescription: # what it does\n  Helps out. Use when demoing.\n---\n",
+    );
+    expect(fm.fields["description"]).toBe("Helps out. Use when demoing.");
+  });
+});

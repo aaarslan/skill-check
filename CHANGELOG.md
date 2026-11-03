@@ -30,6 +30,9 @@
 - Diff change navigation scrolls after windowed rows expand.
 - Root SKILL.md name checks use the selected folder name (CLI and browser).
 - SARIF artifact URIs map to the real reviewed files.
+- Third review round: YAML collections in string fields and standalone
+  comment lines in frontmatter; the `rm` flag regexes replaced with a linear
+  single-pass tokenizer (the remaining quadratic case).
 - Second review round: quadratic-time patterns on adversarial 256 KiB inputs
   (pipe-to-shell, bracket/link scans, per-match context checks, HTML comments)
   are bounded and covered by performance regression tests; YAML block-scalar

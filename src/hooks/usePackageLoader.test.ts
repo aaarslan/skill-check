@@ -108,3 +108,17 @@ describe("input lifecycle", () => {
     );
   });
 });
+
+describe("usePackageLoader root context", () => {
+  it("preserves rootName only when a replacement provides it", () => {
+    const { result } = renderHook(() => usePackageLoader());
+    act(() => result.current.replace([{ path: "SKILL.md", content: "# A" }], "my-skill"));
+    expect(result.current.rootName).toBe("my-skill");
+    act(() =>
+      result.current.replace([{ path: "SKILL.md", content: "# B" }], result.current.rootName),
+    );
+    expect(result.current.rootName).toBe("my-skill");
+    act(() => result.current.replace([{ path: "SKILL.md", content: "# C" }]));
+    expect(result.current.rootName).toBe("");
+  });
+});

@@ -1,5 +1,6 @@
 import { BookOpenText, ShieldCheck, Warning, X } from "@phosphor-icons/react";
 import { Suspense, lazy, useState } from "react";
+import { PanelErrorBoundary } from "./components/common/PanelErrorBoundary.tsx";
 import { FileInputPanel } from "./components/FileInput/FileInputPanel.tsx";
 import { ModePicker, type ReviewModeSelection } from "./components/ModePicker.tsx";
 import { ResultsSection } from "./components/ResultsSection.tsx";
@@ -26,7 +27,7 @@ export function App() {
     }
   });
   const [mode, setMode] = useState<ReviewModeSelection>("single");
-  const { original, candidate, view, report } = useSkillCheckAnalysis(ignoreWhitespace);
+  const { original, candidate, view, report, analyzing } = useSkillCheckAnalysis(ignoreWhitespace);
   const workflow = useReviewDecisions(report);
   const originalSlot = view.kind === "both" || view.kind === "original-only" ? view.original : null;
 
@@ -98,9 +99,11 @@ export function App() {
         }}
       />
       {mode === "package" ? (
-        <Suspense fallback={<p role="status">Loading folder review…</p>}>
-          <PackageReview />
-        </Suspense>
+        <PanelErrorBoundary label="Folder review">
+          <Suspense fallback={<p role="status">Loading folder review…</p>}>
+            <PackageReview />
+          </Suspense>
+        </PanelErrorBoundary>
       ) : (
         <>
           <section
@@ -118,13 +121,16 @@ export function App() {
             workflow={workflow}
             ignoreWhitespace={ignoreWhitespace}
             onIgnoreWhitespaceChange={setIgnoreWhitespace}
+            analyzing={analyzing}
           />
           {report && <ReviewWorkflow review={report} workflow={workflow} />}
         </>
       )}
-      <Suspense fallback={null}>
-        <CalibrationPanel />
-      </Suspense>
+      <PanelErrorBoundary label="Calibration">
+        <Suspense fallback={null}>
+          <CalibrationPanel />
+        </Suspense>
+      </PanelErrorBoundary>
     </main>
   );
 }

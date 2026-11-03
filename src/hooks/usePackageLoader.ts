@@ -19,9 +19,9 @@ export function usePackageLoader() {
     },
     [],
   );
-  const replace = useCallback((input: readonly ReviewSource[]) => {
+  const replace = useCallback((input: readonly ReviewSource[], nextRootName = "") => {
     generation.current++;
-    setRootName("");
+    setRootName(nextRootName);
     setLoading(false);
     try {
       setSources(prepareSources(input));

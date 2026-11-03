@@ -4,6 +4,7 @@ import { countHighSuspicion } from "../domain/injection/detect.ts";
 import type { AnalysisView } from "../hooks/useSkillCheckAnalysis.ts";
 import type { ReviewDecisions } from "../hooks/useReviewDecisions.ts";
 import { EmptyState } from "./common/EmptyState.tsx";
+import { PanelErrorBoundary } from "./common/PanelErrorBoundary.tsx";
 import { InjectionPanel } from "./Injection/InjectionPanel.tsx";
 import { ComparisonSummary } from "./Quality/ComparisonSummary.tsx";
 import { QualityPanel } from "./Quality/QualityPanel.tsx";
@@ -39,6 +40,7 @@ interface ResultsSectionProps {
   readonly workflow: ReviewDecisions;
   readonly ignoreWhitespace: boolean;
   readonly onIgnoreWhitespaceChange: (value: boolean) => void;
+  readonly analyzing?: boolean;
 }
 
 export function ResultsSection({
@@ -46,6 +48,7 @@ export function ResultsSection({
   workflow,
   ignoreWhitespace,
   onIgnoreWhitespaceChange: setIgnoreWhitespace,
+  analyzing = false,
 }: ResultsSectionProps) {
   const [activeTab, setActiveTab] = useState<ResultTab>("overview");
   const originalSlot = view.kind === "both" || view.kind === "original-only" ? view.original : null;
@@ -132,6 +135,7 @@ export function ResultsSection({
 
   return (
     <section id="results" className={styles.results} aria-label="Analysis results">
+      {analyzing && <p role="status">Analyzing the latest edits…</p>}
       <div className={styles.metricGrid}>
         <Metric icon={<ChartBar size={24} />} label="Quality score" value={score} />
         <Metric icon={<Shield size={24} />} label="Risk" value={risk} />
@@ -184,13 +188,15 @@ export function ResultsSection({
         )}
 
         {bothLoaded && activeTab === "diff" && (
-          <Suspense fallback={<p role="status">Loading diff…</p>}>
-            <DiffViewer
-              diff={view.diff}
-              ignoreWhitespace={ignoreWhitespace}
-              onIgnoreWhitespaceChange={setIgnoreWhitespace}
-            />
-          </Suspense>
+          <PanelErrorBoundary label="Diff">
+            <Suspense fallback={<p role="status">Loading diff…</p>}>
+              <DiffViewer
+                diff={view.diff}
+                ignoreWhitespace={ignoreWhitespace}
+                onIgnoreWhitespaceChange={setIgnoreWhitespace}
+              />
+            </Suspense>
+          </PanelErrorBoundary>
         )}
 
         {activeTab === "quality" && (

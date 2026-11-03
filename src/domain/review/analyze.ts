@@ -58,15 +58,21 @@ function localLinks(
   const findings: QualityFinding[] = [];
   const definitions = new Map<string, string>();
   for (const line of doc.lines) {
-    const definition = /^\s{0,3}\[([^\]]+)\]:\s*<?([^\s>]+)>?/u.exec(line);
+    const definition = /^\s{0,3}\[([^\]]{1,500})\]:\s*<?([^\s>]{1,1000})>?/u.exec(line);
     if (definition) definitions.set((definition[1] ?? "").toLowerCase(), definition[2] ?? "");
   }
   doc.lines.forEach((line, index) => {
     if (code.has(index + 1)) return;
     const targets = [
-      ...line.matchAll(/\[[^\]]*\]\(\s*(?:<([^>]+)>|([^\s)]+))(?:\s+"[^"]*")?\s*\)/gu),
+      ...(line.includes("](")
+        ? line.matchAll(
+            /\[[^\]]{0,500}\]\(\s*(?:<([^>]{1,1000})>|([^\s)]{1,1000}))(?:\s+"[^"]{0,200}")?\s*\)/gu,
+          )
+        : []),
     ].map((m) => ({ target: m[1] ?? m[2] ?? "", excerpt: m[0] }));
-    for (const match of line.matchAll(/\[([^\]]+)\]\[([^\]]*)\]/gu)) {
+    for (const match of line.includes("][")
+      ? line.matchAll(/\[([^\]]{1,500})\]\[([^\]]{0,500})\]/gu)
+      : []) {
       const label = (match[2] || match[1] || "").toLowerCase();
       const target = definitions.get(label);
       if (target) targets.push({ target, excerpt: match[0] });

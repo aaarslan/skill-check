@@ -42,12 +42,18 @@ const PATTERNS: readonly PatternSpec[] = [
     suspicion: "medium",
   },
   {
-    pattern: /\b(?:curl|wget)\b[^|\n]*\|\s*(?:sudo\s+)?(?:sh|bash|zsh)\b/iu,
+    pattern: /\b(?:curl|wget)\b[^|\n]{0,120}?\|\s*(?:sudo\s+)?(?:sh|bash|zsh)\b/iu,
     rationale: "Pipes a remote download directly into a shell for execution.",
   },
   {
     pattern: /\b(?:mkfs|dd\s+if=|chmod\s+(?:777|a\+rwx)|chown\s+-R\s+root|:\(\)\s*\{)/iu,
     rationale: "Destructive or privilege-escalating shell construct.",
+    suspicion: "medium",
+  },
+  {
+    pattern:
+      /\brm\s+(?:--recursive\b[^.\n]{0,30}--force\b|--force\b[^.\n]{0,30}--recursive\b|-[a-z]*r[a-z]*\s+-[a-z]*f|-[a-z]*f[a-z]*\s+-[a-z]*r)/iu,
+    rationale: "Recursive forced deletion command with split or long-form flags.",
     suspicion: "medium",
   },
 ];

@@ -7,7 +7,7 @@ export interface CrossFileLinkDocument {
   readonly filename: string | null;
 }
 
-const LINK_PATTERN = /\[([^\]]*)\]\(((?:[^()]|\([^()]*\))*)\)/gu;
+const LINK_PATTERN = /\[([^\]]{0,500})\]\(((?:[^()]|\([^()]{0,1000}\)){0,1000})\)/gu;
 
 function basename(path: string): string {
   return path.replace(/^\.\//u, "").replace(/^.*\//u, "").toLowerCase();
@@ -35,6 +35,7 @@ export function findCrossFileLinkFindings(
 
   sourceDoc.lines.forEach((line, index) => {
     const lineNumber = index + 1;
+    if (!line.includes("](")) return;
     for (const match of line.matchAll(LINK_PATTERN)) {
       const target = (match[2] ?? "").trim();
       const hashIndex = target.indexOf("#");

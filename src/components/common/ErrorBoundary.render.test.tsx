@@ -27,3 +27,22 @@ describe("ErrorBoundary", () => {
     vi.restoreAllMocks();
   });
 });
+
+import { PanelErrorBoundary } from "./PanelErrorBoundary.tsx";
+
+describe("PanelErrorBoundary", () => {
+  it("contains a panel failure without taking down siblings", () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    render(
+      <div>
+        <p>surviving sibling</p>
+        <PanelErrorBoundary label="Diff">
+          <Explodes />
+        </PanelErrorBoundary>
+      </div>,
+    );
+    expect(screen.getByText("surviving sibling")).toBeInTheDocument();
+    expect(screen.getByText(/Diff could not be loaded/u)).toBeInTheDocument();
+    vi.restoreAllMocks();
+  });
+});

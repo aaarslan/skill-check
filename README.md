@@ -199,7 +199,7 @@ safety clearance; without a fail-on gate, findings do not change the exit status
 pnpm build       # type-check and produce a production build in dist/
 pnpm preview     # serve the production build locally
 pnpm check       # format, lint, and type-check (Oxfmt + Oxlint + tsc)
-pnpm test        # run the Vitest suite
+pnpm test        # Vitest suite plus the CLI and packaged-CLI suites
 pnpm coverage    # Vitest with V8 coverage thresholds (85/73/80/86)
 pnpm test:e2e    # build, preview, and smoke-test the served app shell
 pnpm test:browser # Playwright suite in system Chrome (all modes, both themes)

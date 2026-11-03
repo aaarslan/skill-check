@@ -84,3 +84,86 @@ describe("validateSkillPackage", () => {
     ).toBe(true);
   });
 });
+
+describe("frontmatter scalar edge cases", () => {
+  it("keeps block scalar paragraphs across blank lines for length checks", () => {
+    const content = `---\nname: demo\ndescription: >\n  Use when demoing.\n\n  ${"x ".repeat(600)}\n---\n`;
+    expect(parseFrontmatter(content).fields["description"]?.length).toBeGreaterThan(1024);
+    expect(
+      validateSkillDocument(content, "SKILL.md").some(
+        (f) => f.ruleId === "spec/description-too-long",
+      ),
+    ).toBe(true);
+    const literal = parseFrontmatter("---\nname: d\ndescription: |\n  one\n\n  two\n---\n");
+    expect(literal.fields["description"]).toBe("one\n\ntwo");
+  });
+  it("joins plain and quoted multiline scalars", () => {
+    const plain = parseFrontmatter(
+      "---\nname: demo\ndescription: Helps with demos\n  and examples. Use when needed.\n---\n",
+    );
+    expect(plain.fields["description"]).toBe("Helps with demos and examples. Use when needed.");
+    const quoted = parseFrontmatter(
+      '---\nname: demo\ndescription: "Helps with demos.\n  Use when needed."\n---\n',
+    );
+    expect(quoted.fields["description"]).toBe("Helps with demos. Use when needed.");
+  });
+  it("treats frontmatter keys as case-sensitive", () => {
+    const rules = validateSkillDocument(
+      "---\nName: demo\ndescription: Helps. Use when demoing.\n---\n",
+      "SKILL.md",
+    ).map((f) => f.ruleId);
+    expect(rules).toContain("spec/name-missing");
+    expect(rules).toContain("spec/unknown-field");
+  });
+});
+
+describe("YAML scalar fidelity", () => {
+  it("recognizes block header variants with chomping, indent, and comments", () => {
+    for (const header of [">+", "|+", ">2", "> # fold", ">-2"]) {
+      const fm = parseFrontmatter(
+        `---\nname: demo\ndescription: ${header}\n  Use when demoing.\n---\n`,
+      );
+      expect(fm.fields["description"]).toBe("Use when demoing.");
+    }
+    const long = `---\nname: demo\ndescription: >+\n  Use when demoing. ${"x ".repeat(600)}\n---\n`;
+    expect(
+      validateSkillDocument(long, "SKILL.md").some((f) => f.ruleId === "spec/description-too-long"),
+    ).toBe(true);
+  });
+  it("flags non-string YAML scalars for name and description", () => {
+    for (const bad of ["null", "true", "123", "yes"]) {
+      const rules = validateSkillDocument(
+        `---\nname: ${bad}\ndescription: Helps. Use when demoing.\n---\n`,
+        "SKILL.md",
+      ).map((f) => f.ruleId);
+      expect(rules).toContain("spec/non-string-field");
+      expect(rules).not.toContain("spec/name-missing");
+    }
+    expect(
+      validateSkillDocument(
+        '---\nname: "123"\ndescription: Helps. Use when demoing.\n---\n',
+        "SKILL.md",
+      ).some((f) => f.ruleId === "spec/non-string-field"),
+    ).toBe(false);
+  });
+  it("accepts spaced and quoted keys", () => {
+    expect(parseFrontmatter("---\nname : demo\n---\n").fields["name"]).toBe("demo");
+    expect(parseFrontmatter('---\n"name": demo\n---\n').fields["name"]).toBe("demo");
+  });
+  it("decodes double-quoted escapes and flags trailing garbage", () => {
+    expect(parseFrontmatter('---\nname: "a\\u0062c"\n---\n').fields["name"]).toBe("abc");
+    const rules = validateSkillDocument(
+      '---\nname: "demo"garbage\ndescription: Helps. Use when demoing.\n---\n',
+      "SKILL.md",
+    ).map((f) => f.ruleId);
+    expect(rules).toContain("spec/frontmatter-invalid");
+  });
+  it("counts characters as code points, not UTF-16 units", () => {
+    const desc = `${"😀".repeat(600)} Use when demoing.`;
+    const rules = validateSkillDocument(
+      `---\nname: demo\ndescription: ${desc}\n---\n`,
+      "SKILL.md",
+    ).map((f) => f.ruleId);
+    expect(rules).not.toContain("spec/description-too-long");
+  });
+});

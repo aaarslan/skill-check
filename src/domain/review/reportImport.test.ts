@@ -58,8 +58,10 @@ describe("report import and SARIF", () => {
     expect(sarif.version).toBe("2.1.0");
     const results = sarif.runs[0]!.results;
     expect(results.some((r) => r.ruleId === "spec/frontmatter-missing")).toBe(true);
+    const docLevel = results.find((r) => r.ruleId === "actionability/has-constraints");
+    expect(docLevel?.locations[0]?.physicalLocation.region).toBeUndefined();
     expect(
-      results.every((r) => (r.locations[0]?.physicalLocation.region.startLine ?? 0) >= 1),
+      results.every((r) => (r.locations[0]?.physicalLocation.region?.startLine ?? 1) >= 1),
     ).toBe(true);
   });
 });

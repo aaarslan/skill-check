@@ -43,6 +43,12 @@ export function isSkillDocumentPath(path: string | null): boolean {
   return /(^|\/)SKILL\.md$/u.test(path) || /\.(md|markdown)$/iu.test(path);
 }
 
+function charCount(value: string): number {
+  let count = 0;
+  for (const _char of value) count++;
+  return count;
+}
+
 export function validateSkillDocument(
   content: string,
   path: string | null,
@@ -75,24 +81,52 @@ export function validateSkillDocument(
       ),
     );
   }
-  const name = fm.fields["name"];
-  if (!name) {
+  for (const key of fm.invalidFields) {
     out.push(
       finding(
-        "name-missing",
+        "frontmatter-invalid",
         "high",
-        "Frontmatter has no name field",
-        "Add name: with the skill directory name.",
-        1,
+        `Frontmatter field "${key}" is not a valid YAML scalar`,
+        "Fix the quoting so a YAML loader can parse the value.",
+        lineOf(key),
+        key,
       ),
     );
+  }
+  const nonString = new Set(fm.nonStringFields);
+  const rawName = fm.fields["name"];
+  if (rawName !== undefined && nonString.has("name")) {
+    out.push(
+      finding(
+        "non-string-field",
+        "high",
+        'Frontmatter "name" must be a string, not a number, boolean, or null',
+        "Quote the name so YAML loads it as a string matching the directory.",
+        lineOf("name"),
+        rawName,
+      ),
+    );
+  }
+  const name = nonString.has("name") ? undefined : rawName;
+  if (!name) {
+    if (!nonString.has("name")) {
+      out.push(
+        finding(
+          "name-missing",
+          "high",
+          "Frontmatter has no name field",
+          "Add name: with the skill directory name.",
+          1,
+        ),
+      );
+    }
   } else {
-    if (name.length > 64)
+    if (charCount(name) > 64)
       out.push(
         finding(
           "name-too-long",
           "high",
-          `Skill name is ${name.length} characters (max 64)`,
+          `Skill name is ${charCount(name)} characters (max 64)`,
           "Shorten the name to 64 characters or fewer.",
           lineOf("name"),
           name.slice(0, 80),
@@ -145,24 +179,39 @@ export function validateSkillDocument(
         ),
       );
   }
-  const description = fm.fields["description"];
-  if (!description) {
+  const rawDescription = fm.fields["description"];
+  if (rawDescription !== undefined && nonString.has("description")) {
     out.push(
       finding(
-        "description-missing",
+        "non-string-field",
         "high",
-        "Frontmatter has no description field",
-        "Add description: stating what the skill does and when to use it.",
-        1,
+        'Frontmatter "description" must be a string, not a number, boolean, or null',
+        "Quote the description so YAML loads it as a string.",
+        lineOf("description"),
+        rawDescription,
       ),
     );
+  }
+  const description = nonString.has("description") ? undefined : rawDescription;
+  if (!description) {
+    if (!nonString.has("description")) {
+      out.push(
+        finding(
+          "description-missing",
+          "high",
+          "Frontmatter has no description field",
+          "Add description: stating what the skill does and when to use it.",
+          1,
+        ),
+      );
+    }
   } else {
-    if (description.length > 1024)
+    if (charCount(description) > 1024)
       out.push(
         finding(
           "description-too-long",
           "high",
-          `Description is ${description.length} characters (max 1024)`,
+          `Description is ${charCount(description)} characters (max 1024)`,
           "Trim the description to 1024 characters or fewer; move detail into the body.",
           lineOf("description"),
           description.slice(0, 80),
@@ -181,7 +230,7 @@ export function validateSkillDocument(
       );
   }
   const compatibility = fm.fields["compatibility"];
-  if (compatibility !== undefined && (compatibility.length === 0 || compatibility.length > 500))
+  if (compatibility !== undefined && (compatibility.length === 0 || charCount(compatibility) > 500))
     out.push(
       finding(
         "compatibility-length",

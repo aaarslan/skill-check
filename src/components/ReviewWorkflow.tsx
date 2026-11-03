@@ -1,3 +1,4 @@
+import { useRef, useState } from "react";
 import type { ReviewDecisions } from "../hooks/useReviewDecisions.ts";
 import type { Review } from "../domain/review/analyze.ts";
 import {
@@ -29,6 +30,9 @@ export function ReviewWorkflow({
   readonly workflow: ReviewDecisions;
 }) {
   const { decisions, update } = workflow;
+  const [importStatus, setImportStatus] = useState<{ ok: boolean; message: string } | null>(null);
+  const reviewRef = useRef(review);
+  reviewRef.current = review;
   const findings = reviewFindings(review);
   return (
     <section className={styles.results} aria-label="Review workflow">
@@ -69,17 +73,29 @@ export function ReviewWorkflow({
               const file = event.target.files?.[0];
               event.target.value = "";
               if (!file) return;
-              void file.text().then((text) => {
-                try {
-                  workflow.importAll(importDecisions(text, review));
-                } catch {
-                  // Invalid report files are ignored rather than crashing the review.
-                }
-              });
+              void file
+                .text()
+                .then((text) => {
+                  const current = reviewRef.current;
+                  const imported = importDecisions(text, current);
+                  workflow.importAll(imported, current);
+                  const count = Object.keys(imported).length;
+                  setImportStatus({
+                    ok: true,
+                    message: `Imported ${count} decision${count === 1 ? "" : "s"} from "${file.name}".`,
+                  });
+                })
+                .catch((cause: unknown) => {
+                  setImportStatus({
+                    ok: false,
+                    message: `Could not import "${file.name}": ${cause instanceof Error ? cause.message : "the file could not be read."}`,
+                  });
+                });
             }}
           />
         </label>
       </div>
+      {importStatus && <p role={importStatus.ok ? "status" : "alert"}>{importStatus.message}</p>}
       <p className={styles.sectionDisclaimer}>
         Rules {review.ruleVersion} · Report {review.schemaVersion}. JSON includes source text;
         Markdown includes findings and notes. Exports stay on your device until you share them.

@@ -124,3 +124,14 @@ describe("App", () => {
     expect(screen.getByRole("tab", { name: "Diff" })).toHaveAttribute("aria-selected", "true");
   });
 });
+
+describe("decision import feedback", () => {
+  it("reports a failed import instead of failing silently", async () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Try review example" }));
+    const input = screen.getByLabelText("Import decisions from a JSON report");
+    const bad = new File(["not json"], "bad.json", { type: "application/json" });
+    fireEvent.change(input, { target: { files: [bad] } });
+    expect(await screen.findByRole("alert")).toHaveTextContent(/Could not import "bad\.json"/u);
+  });
+});

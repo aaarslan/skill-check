@@ -45,7 +45,7 @@ const PATTERNS: readonly PatternSpec[] = [
     suspicion: "medium",
   },
   {
-    pattern: /\[\s*\/?\s*(?:SYSTEM|SYS|ADMIN|DEVELOPER)\s*\]/u,
+    pattern: /\[\s*\/?\s*(?:SYSTEM|SYS|ADMIN|DEVELOPER)\s*\]/iu,
     rationale: "Fake bracketed role delimiter mimicking a privileged message boundary.",
     suspicion: "medium",
   },

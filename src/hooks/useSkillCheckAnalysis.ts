@@ -23,6 +23,7 @@ export interface SkillCheckAnalysis {
   readonly candidate: FileLoaderApi;
   readonly view: AnalysisView;
   readonly report: Review | null;
+  readonly analyzing: boolean;
 }
 
 /** Revisions are independent documents; only package review resolves sibling links. */
@@ -54,7 +55,10 @@ export function useSkillCheckAnalysis(ignoreWhitespace: boolean): SkillCheckAnal
     ],
     [originalFile, candidateFile],
   );
-  const report = useAsyncReview(sources.length === 2 ? "compare" : "single", sources);
+  const { review: report, pending } = useAsyncReview(
+    sources.length === 2 ? "compare" : "single",
+    sources,
+  );
   const diff = useMemo(
     () =>
       originalFile && candidateFile
@@ -80,5 +84,5 @@ export function useSkillCheckAnalysis(ignoreWhitespace: boolean): SkillCheckAnal
       ? { kind: "original-only", original: first }
       : { kind: "candidate-only", candidate: first };
   }, [report, originalFile, candidateFile, diff]);
-  return { original, candidate, view, report };
+  return { original, candidate, view, report, analyzing: pending };
 }

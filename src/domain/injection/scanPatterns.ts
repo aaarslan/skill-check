@@ -2,7 +2,7 @@ import type { AnalyzableDocument } from "../shared/markdown.ts";
 import { codeBlockLineSet } from "../shared/markdown.ts";
 import { downgradeIfDescriptive, isDescriptiveFraming } from "./mood.ts";
 import { normalizeForMatching } from "./normalize.ts";
-import { downgradeIfQuoted, isLikelyQuotedContext } from "./quotedContext.ts";
+import { downgradeIfQuoted, isLikelyQuotedContext, prepareQuotedChecker } from "./quotedContext.ts";
 import { upgradeSuspicionTier } from "./suspicion.ts";
 import type { InjectionCategory, InjectionFinding, Suspicion } from "./types.ts";
 
@@ -38,6 +38,7 @@ export function scanPatterns(
 
   doc.lines.forEach((line, index) => {
     const lineNumber = index + 1;
+    const quotedAt = prepareQuotedChecker(doc, lineNumber, codeLines);
     const normalizedLine = normalizeForMatching(line);
     const lineWasNormalized = normalizedLine !== line;
 
@@ -50,13 +51,7 @@ export function scanPatterns(
         matchedRaw = true;
         const matchedText = match[0];
         const matchIndex = match.index ?? 0;
-        const quoted = isLikelyQuotedContext(
-          doc,
-          lineNumber,
-          codeLines,
-          matchIndex,
-          matchedText.length,
-        );
+        const quoted = quotedAt(matchIndex, matchedText.length);
         const descriptive = isDescriptiveFraming(line, matchIndex);
         const suspicion = downgradeIfDescriptive(
           downgradeIfQuoted(baseSuspicion, quoted),

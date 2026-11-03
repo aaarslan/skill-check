@@ -4,6 +4,8 @@ export interface ParsedFrontmatter {
   readonly fields: Readonly<Record<string, string>>;
   readonly metadata: Readonly<Record<string, string>>;
   readonly fieldLines: Readonly<Record<string, number>>;
+  readonly nonStringFields: readonly string[];
+  readonly invalidFields: readonly string[];
   readonly bodyStartLine: number;
 }
 
@@ -13,32 +15,71 @@ const EMPTY: ParsedFrontmatter = {
   fields: {},
   metadata: {},
   fieldLines: {},
+  nonStringFields: [],
+  invalidFields: [],
   bodyStartLine: 1,
 };
 
-function unquote(value: string): string {
-  const trimmed = value.trim();
-  const quote = trimmed.startsWith('"') ? '"' : trimmed.startsWith("'") ? "'" : null;
-  if (quote) {
-    let index = 1;
-    while (index < trimmed.length) {
-      if (quote === '"' && trimmed[index] === "\\") {
+const NON_STRING_SCALAR =
+  /^(?:null|~|true|false|yes|no|on|off|[+-]?(?:\d[\d_]*\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)$/iu;
+const BLOCK_HEADER = /^([>|])(?:[+-]?\d?|\d[+-]?)?\s*(?:#.*)?$/u;
+
+function decodeDoubleQuoted(inner: string): string {
+  return inner.replace(
+    /\\(?:u([0-9a-fA-F]{4})|x([0-9a-fA-F]{2})|n|t|r|0|\\|"|\/|.)/gu,
+    (whole, unicode: string | undefined, hex: string | undefined) => {
+      if (unicode) return String.fromCharCode(parseInt(unicode, 16));
+      if (hex) return String.fromCharCode(parseInt(hex, 16));
+      switch (whole.slice(1)) {
+        case "n":
+          return "\n";
+        case "t":
+          return "\t";
+        case "r":
+          return "\r";
+        case "0":
+          return "\0";
+        default:
+          return whole.slice(1);
+      }
+    },
+  );
+}
+
+function findClosingQuote(value: string, quote: string): number {
+  let index = 1;
+  while (index < value.length) {
+    if (quote === '"' && value[index] === "\\") {
+      index += 2;
+      continue;
+    }
+    if (value[index] === quote) {
+      if (quote === "'" && value[index + 1] === "'") {
         index += 2;
         continue;
       }
-      if (trimmed[index] === quote) {
-        if (quote === "'" && trimmed[index + 1] === "'") {
-          index += 2;
-          continue;
-        }
-        const inner = trimmed.slice(1, index);
-        return quote === "'" ? inner.replace(/''/gu, "'") : inner;
-      }
-      index++;
+      return index;
     }
-    return trimmed.slice(1);
+    index++;
   }
-  return trimmed.replace(/\s+#.*$/u, "").trim();
+  return -1;
+}
+
+function unquote(value: string): { value: string; invalid: boolean } {
+  const trimmed = value.trim();
+  const quote = trimmed.startsWith('"') ? '"' : trimmed.startsWith("'") ? "'" : null;
+  if (quote) {
+    const close = findClosingQuote(trimmed, quote);
+    if (close < 0) return { value: trimmed.slice(1), invalid: true };
+    const rest = trimmed.slice(close + 1).trim();
+    const invalid = rest !== "" && !rest.startsWith("#");
+    const inner = trimmed.slice(1, close);
+    return {
+      value: quote === "'" ? inner.replace(/''/gu, "'") : decodeDoubleQuoted(inner),
+      invalid,
+    };
+  }
+  return { value: trimmed.replace(/\s+#.*$/u, "").trim(), invalid: false };
 }
 
 export function parseFrontmatter(content: string): ParsedFrontmatter {
@@ -50,39 +91,102 @@ export function parseFrontmatter(content: string): ParsedFrontmatter {
   let inMetadata = false;
   let blockKey: string | null = null;
   let blockFolded = true;
+  let pendingBlanks = 0;
+  let plainKey: string | null = null;
+  let pendingQuote: { key: string; quote: string; text: string } | null = null;
+  const nonStringFields: string[] = [];
+  const invalidFields: string[] = [];
   for (let i = 1; i < lines.length; i++) {
     const line = lines[i] ?? "";
     if (/^(---|\.\.\.)\s*$/u.test(line)) {
-      return { present: true, closed: true, fields, metadata, fieldLines, bodyStartLine: i + 2 };
+      return {
+        present: true,
+        closed: true,
+        fields,
+        metadata,
+        fieldLines,
+        nonStringFields,
+        invalidFields,
+        bodyStartLine: i + 2,
+      };
     }
-    if (blockKey && /^\s+\S/u.test(line)) {
-      const prior = fields[blockKey] ?? "";
-      fields[blockKey] = prior ? `${prior}${blockFolded ? " " : "\n"}${line.trim()}` : line.trim();
+    if (pendingQuote) {
+      pendingQuote.text += ` ${line.trim()}`;
+      if (findClosingQuote(pendingQuote.text, pendingQuote.quote) >= 0) {
+        const decoded = unquote(pendingQuote.text);
+        fields[pendingQuote.key] = decoded.value;
+        if (decoded.invalid) invalidFields.push(pendingQuote.key);
+        pendingQuote = null;
+      }
       continue;
     }
-    blockKey = null;
+    if (blockKey) {
+      if (line.trim() === "") {
+        pendingBlanks++;
+        continue;
+      }
+      if (/^\s+\S/u.test(line)) {
+        const prior = fields[blockKey] ?? "";
+        if (!prior) {
+          fields[blockKey] = line.trim();
+        } else {
+          const separator =
+            pendingBlanks > 0
+              ? "\n".repeat(blockFolded ? pendingBlanks : pendingBlanks + 1)
+              : blockFolded
+                ? " "
+                : "\n";
+          fields[blockKey] = `${prior}${separator}${line.trim()}`;
+        }
+        pendingBlanks = 0;
+        continue;
+      }
+      blockKey = null;
+      pendingBlanks = 0;
+    }
     if (inMetadata && /^\s+\S/u.test(line)) {
       const m = /^\s+([^:]+):\s*(.*)$/u.exec(line);
-      if (m) metadata[(m[1] ?? "").trim()] = unquote(m[2] ?? "");
+      if (m) metadata[(m[1] ?? "").trim()] = unquote(m[2] ?? "").value;
+      continue;
+    }
+    if (inMetadata && line.trim() === "") {
       continue;
     }
     inMetadata = false;
-    const m = /^([A-Za-z][\w-]*):\s*(.*)$/u.exec(line);
+    if (plainKey && /^\s+\S/u.test(line)) {
+      const prior = fields[plainKey] ?? "";
+      fields[plainKey] = prior ? `${prior} ${line.trim()}` : line.trim();
+      continue;
+    }
+    plainKey = null;
+    const m = /^(?:"([^"]+)"|'([^']+)'|([A-Za-z][\w-]*))\s*:\s*(.*)$/u.exec(line);
     if (!m) continue;
-    const key = (m[1] ?? "").toLowerCase();
-    const raw = (m[2] ?? "").trim();
+    const key = m[1] ?? m[2] ?? m[3] ?? "";
+    const raw = (m[4] ?? "").trim();
     fieldLines[key] = i + 1;
     if (key === "metadata" && raw === "") {
       inMetadata = true;
       continue;
     }
-    if (raw === ">" || raw === ">-" || raw === "|" || raw === "|-") {
+    const blockHeader = BLOCK_HEADER.exec(raw);
+    if (blockHeader) {
       blockKey = key;
-      blockFolded = raw.startsWith(">");
+      blockFolded = blockHeader[1] === ">";
+      pendingBlanks = 0;
       fields[key] = "";
       continue;
     }
-    fields[key] = unquote(raw);
+    const quote = raw.startsWith('"') ? '"' : raw.startsWith("'") ? "'" : null;
+    if (quote && findClosingQuote(raw, quote) < 0) {
+      pendingQuote = { key, quote, text: raw };
+      fields[key] = "";
+      continue;
+    }
+    const decoded = unquote(raw);
+    fields[key] = decoded.value;
+    if (decoded.invalid) invalidFields.push(key);
+    if (!quote && NON_STRING_SCALAR.test(decoded.value)) nonStringFields.push(key);
+    plainKey = quote ? null : key;
   }
   return {
     present: true,
@@ -90,6 +194,8 @@ export function parseFrontmatter(content: string): ParsedFrontmatter {
     fields,
     metadata,
     fieldLines,
+    nonStringFields,
+    invalidFields,
     bodyStartLine: lines.length + 1,
   };
 }

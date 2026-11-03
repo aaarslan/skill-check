@@ -20,7 +20,9 @@ export function DiffViewer({ diff, ignoreWhitespace, onIgnoreWhitespaceChange }:
   const [viewMode, setViewMode] = useState<DiffViewMode>("side-by-side");
   const [currentChangeIndex, setCurrentChangeIndex] = useState(-1);
   const [showAllRows, setShowAllRows] = useState(false);
+  const [scrollRequest, setScrollRequest] = useState(0);
   const rowRefs = useRef(new Map<number, HTMLElement>());
+  const scrollAreaRef = useRef<HTMLDivElement | null>(null);
 
   const sideBySideRows = useMemo(() => buildSideBySideRows(diff), [diff]);
   const groups = useMemo(
@@ -42,6 +44,7 @@ export function DiffViewer({ diff, ignoreWhitespace, onIgnoreWhitespaceChange }:
   const pendingScrollRef = useRef<number | null>(null);
 
   useEffect(() => {
+    if (scrollRequest === 0) return;
     const startIndex = pendingScrollRef.current;
     if (startIndex === null) return;
     const element = rowRefs.current.get(startIndex);
@@ -49,7 +52,7 @@ export function DiffViewer({ diff, ignoreWhitespace, onIgnoreWhitespaceChange }:
     pendingScrollRef.current = null;
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     element.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "center" });
-  });
+  }, [scrollRequest, showAllRows, viewMode]);
 
   const goToGroup = (index: number) => {
     const group = groups[index];
@@ -57,6 +60,7 @@ export function DiffViewer({ diff, ignoreWhitespace, onIgnoreWhitespaceChange }:
     if (group) {
       pendingScrollRef.current = group.startIndex;
       setShowAllRows(true);
+      setScrollRequest((value) => value + 1);
     }
   };
 
@@ -117,12 +121,18 @@ export function DiffViewer({ diff, ignoreWhitespace, onIgnoreWhitespaceChange }:
             {windowed && (
               <p role="status">
                 Showing the first 600 of {rowCount} rows to keep the review responsive.{" "}
-                <button type="button" onClick={() => setShowAllRows(true)}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAllRows(true);
+                    scrollAreaRef.current?.focus();
+                  }}
+                >
                   Show all rows
                 </button>
               </p>
             )}
-            <div className={styles.scrollArea}>
+            <div className={styles.scrollArea} ref={scrollAreaRef} tabIndex={-1}>
               {viewMode === "unified" ? (
                 <UnifiedDiff
                   lines={windowed ? diff.lines.slice(0, 600) : diff.lines}

@@ -9,7 +9,7 @@ import styles from "../App.module.css";
 export function PackageReview() {
   const loader = usePackageLoader();
   const deferredSources = useDeferredValue(loader.sources);
-  const report = useAsyncReview("package", deferredSources, {
+  const { review: report, pending } = useAsyncReview("package", deferredSources, {
     packageRootName: loader.rootName || undefined,
   });
   const [draft, setDraft] = useState<{ path: string; content: string } | null>(null);
@@ -62,6 +62,7 @@ export function PackageReview() {
         </button>
       </div>
       {loader.loading && <p role="status">Reading selected text files…</p>}
+      {pending && <p role="status">Analyzing…</p>}
       {loader.error && <p role="alert">{loader.error}</p>}
       {report && (
         <>
@@ -116,6 +117,7 @@ export function PackageReview() {
                 onClick={() =>
                   loader.replace(
                     loader.sources.map((source) => (source.path === draft.path ? draft : source)),
+                    loader.rootName,
                   )
                 }
               >

@@ -30,6 +30,17 @@
 - Diff change navigation scrolls after windowed rows expand.
 - Root SKILL.md name checks use the selected folder name (CLI and browser).
 - SARIF artifact URIs map to the real reviewed files.
+- Second review round: quadratic-time patterns on adversarial 256 KiB inputs
+  (pipe-to-shell, bracket/link scans, per-match context checks, HTML comments)
+  are bounded and covered by performance regression tests; YAML block-scalar
+  variants, quoted/spaced keys, non-string scalars, escapes, and code-point
+  length counting; invisible-Unicode findings respect quoted context;
+  lowercase fake delimiters and split/long-form `rm` flags; strict `--config`
+  validation; region-free SARIF locations for document-level findings;
+  root-folder context preserved across in-package edits; diff navigation
+  re-scrolls to the same group and keeps focus on expand; worker analysis is
+  stale-while-revalidate with supersede/timeout handling; decision import
+  reports success and failure; lazy panels fail in place.
 
 ## 1.0.0 - 2026-11-02
 

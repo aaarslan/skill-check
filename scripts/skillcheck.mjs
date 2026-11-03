@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { lstat, readdir, realpath, open, writeFile } from "node:fs/promises";
 import { resolve, relative, basename, sep } from "node:path";
+import { pathToFileURL } from "node:url";
 import { analyzeReview } from "../src/domain/review/analyze.ts";
 import { exportReview, markdownReport, sarifReport } from "../src/domain/review/report.ts";
 import { readFile } from "node:fs/promises";
@@ -116,13 +117,19 @@ try {
     throw new Error("Format must be json, md, or sarif.");
   if (configPath) {
     const config = JSON.parse(await readFile(resolve(configPath), "utf8"));
+    if (!config || typeof config !== "object" || Array.isArray(config))
+      throw new Error("Config must be a JSON object.");
+    for (const key of Object.keys(config)) {
+      if (key !== "failOn") throw new Error(`Unknown config key: ${key}`);
+    }
     if (
-      config &&
-      typeof config === "object" &&
       "failOn" in config &&
-      failOn === null &&
-      !failOnHigh
+      config.failOn !== null &&
+      config.failOn !== "high" &&
+      config.failOn !== "medium"
     )
+      throw new Error('Config "failOn" must be "high", "medium", or null.');
+    if ("failOn" in config && config.failOn !== null && failOn === null && !failOnHigh)
       failOn = config.failOn;
   }
   if (failOnHigh) failOn = "high";
@@ -168,16 +175,21 @@ try {
             })),
           );
     const sources = loaded.map(({ path, content }) => ({ path, content }));
-    const toUri = (absolute) =>
-      relative(process.cwd(), absolute)
+    const toUri = (absolute) => {
+      const rel = relative(process.cwd(), absolute);
+      if (rel === "") return ".";
+      if (rel.startsWith(`..${sep}`) || rel === "..") return pathToFileURL(absolute).href;
+      return rel
         .split(sep)
-        .map((segment) =>
-          segment === ".." || segment === "." ? segment : encodeURIComponent(segment),
-        )
+        .map((segment) => encodeURIComponent(segment))
         .join("/");
+    };
     const artifactUris = Object.fromEntries(
-      loaded.filter((s) => s.realPath).map((s) => [s.path, toUri(s.realPath)]),
+      loaded
+        .filter((s) => s.realPath)
+        .map((s) => [s.path.normalize("NFC").replaceAll("\\", "/"), toUri(s.realPath)]),
     );
+    if (mode === "package") artifactUris["(package)"] = toUri(resolve(paths[0]));
     const packageRootName =
       mode === "package" ? basename(await realpath(resolve(paths[0]))) : undefined;
     const review = analyzeReview(mode, sources, { packageRootName });

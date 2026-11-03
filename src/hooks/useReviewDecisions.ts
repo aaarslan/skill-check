@@ -24,7 +24,8 @@ export function useReviewDecisions(review: Review | null) {
       restore: (id) => update(key(id), { status: "open", note: decisions[key(id)]?.note ?? "" }),
     };
   };
-  const importAll = (next: Decisions) => setState({ review, decisions: next });
+  const importAll = (next: Decisions, forReview: Review | null = review) =>
+    setState({ review: forReview, decisions: next });
   return { decisions, update, importAll, injectionDismissals };
 }
 

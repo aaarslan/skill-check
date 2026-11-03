@@ -154,14 +154,19 @@ export function sarifReport(
           ruleId: finding.rule,
           level: SARIF_LEVEL[finding.level] ?? "note",
           message: { text: `${finding.message} Suggestion: ${finding.suggestion}` },
-          locations: [
-            {
-              physicalLocation: {
-                artifactLocation: { uri: artifactUris[finding.path] ?? finding.path },
-                region: { startLine: Math.max(1, finding.line ?? 1) },
-              },
-            },
-          ],
+          locations:
+            finding.path === "(package)" && !(finding.path in artifactUris)
+              ? []
+              : [
+                  {
+                    physicalLocation: {
+                      artifactLocation: { uri: artifactUris[finding.path] ?? finding.path },
+                      ...(finding.line === null
+                        ? {}
+                        : { region: { startLine: Math.max(1, finding.line) } }),
+                    },
+                  },
+                ],
           properties: {
             decision: finding.decision.status,
             level: finding.level,

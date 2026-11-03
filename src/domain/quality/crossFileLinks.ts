@@ -42,7 +42,7 @@ export function findCrossFileLinkFindings(
       if (hashIndex <= 0) {
         continue;
       }
-      const pathPart = target.slice(0, hashIndex);
+      const pathPart = target.slice(0, hashIndex).split("?")[0] ?? "";
       const fragment = target.slice(hashIndex + 1).toLowerCase();
       if (fragment.length === 0 || basename(pathPart) !== siblingBasename) {
         continue;

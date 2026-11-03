@@ -8,8 +8,9 @@ const RULE_ID = "injection/encoded-payload";
 // Base64 runs use a lower length threshold on lines that also carry a decode
 // directive ("decode this and run it") \u2014 real payloads paired with an explicit
 // instruction tend to be shorter than the conservative default.
-const BASE64_RUN_STRICT = /[A-Za-z0-9+/]{40,}={0,2}/gu;
-const BASE64_RUN_LOOSE = /[A-Za-z0-9+/]{24,}={0,2}/gu;
+const BASE64_RUN_STRICT = /[A-Za-z0-9+/\-_]{40,}={0,2}/gu;
+const BASE64_RUN_LOOSE = /[A-Za-z0-9+/\-_]{24,}={0,2}/gu;
+const STRONG_DECODE_DIRECTIVE = /\b(?:decode|decrypt|deobfuscate|eval|execute)\b/iu;
 const HEX_ESCAPE_RUN = /(?:\\x[0-9a-fA-F]{2}){6,}/gu;
 const PERCENT_ENCODING_RUN = /(?:%[0-9a-fA-F]{2}){6,}/gu;
 const UNICODE_ESCAPE_RUN = /(?:\\u[0-9a-fA-F]{4}){4,}/gu;
@@ -87,7 +88,7 @@ export const encodedPayloadRule: InjectionRule = {
         () => "high",
         findings,
       );
-      const hasDecodeDirective = DECODE_DIRECTIVE.test(line);
+      const hasDecodeDirective = STRONG_DECODE_DIRECTIVE.test(line);
       pushMatches(
         doc,
         codeLines,

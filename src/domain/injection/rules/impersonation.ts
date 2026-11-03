@@ -1,5 +1,5 @@
 import type { AnalyzableDocument } from "../../shared/markdown.ts";
-import { scanPatterns, type PatternSpec } from "../scanPatterns.ts";
+import { scanCrossLinePatterns, scanPatterns, type PatternSpec } from "../scanPatterns.ts";
 import type { InjectionFinding, InjectionRule } from "../types.ts";
 
 const RULE_ID = "injection/impersonation";
@@ -45,6 +45,9 @@ export const impersonationRule: InjectionRule = {
   description:
     "Detects attempts to impersonate system, developer, administrator, or tool messages.",
   evaluate(doc: AnalyzableDocument): InjectionFinding[] {
-    return scanPatterns(doc, RULE_ID, "impersonation", "high", PATTERNS);
+    return [
+      ...scanPatterns(doc, RULE_ID, "impersonation", "high", PATTERNS),
+      ...scanCrossLinePatterns(doc, RULE_ID, "impersonation", "high", PATTERNS),
+    ];
   },
 };

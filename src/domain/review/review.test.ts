@@ -33,7 +33,8 @@ describe("portable review input", () => {
   });
   it("bounds pasted UTF-8 bytes, total package bytes, lines, and binary text", () => {
     expect(() => validateContent("😀".repeat(65537))).toThrow(/256 KiB/);
-    expect(() => validateContent("\n".repeat(4000))).toThrow(/lines/);
+    expect(validateContent("a\n".repeat(4000)).split("\n")).toHaveLength(4001);
+    expect(() => validateContent("a\n".repeat(4001))).toThrow(/lines/);
     expect(() => validateContent("a\0b")).toThrow(/Binary/);
     expect(() =>
       prepareSources(

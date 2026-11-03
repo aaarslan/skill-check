@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { lstat, readdir, realpath, open, writeFile } from "node:fs/promises";
-import { resolve, relative, basename, sep } from "node:path";
+import { resolve, relative, basename, dirname, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 import { analyzeReview } from "../src/domain/review/analyze.ts";
 import { exportReview, markdownReport, sarifReport } from "../src/domain/review/report.ts";
@@ -57,14 +57,23 @@ async function readFolder(folder) {
   const sources = [];
   let totalBytes = 0;
   let entriesVisited = 0;
+  let skippedEntries = 0;
   async function walk(directory, depth = 0) {
     if (depth > 20) throw new Error("Package folders may be at most 20 levels deep.");
     for (const entry of await readdir(directory, { withFileTypes: true })) {
+      if (entry.name.startsWith(".") || entry.name === "node_modules") {
+        skippedEntries++;
+        continue;
+      }
       if (++entriesVisited > 500) throw new Error("Package contains too many directory entries.");
       const full = resolve(directory, entry.name);
       if (entry.isSymbolicLink()) throw new Error(`Symbolic links are not accepted: ${entry.name}`);
       if (entry.isDirectory()) await walk(full, depth + 1);
       else {
+        if (!TEXT_FILE_PATTERN.test(entry.name)) {
+          skippedEntries++;
+          continue;
+        }
         if (sources.length >= INPUT_LIMITS.files) throw new Error("Package exceeds 100 files.");
         const content = await readText(full, root);
         totalBytes += Buffer.byteLength(content);
@@ -74,6 +83,11 @@ async function readFolder(folder) {
     }
   }
   await walk(root);
+  if (skippedEntries > 0)
+    process.stderr.write(
+      `Skillcheck: skipped ${skippedEntries} hidden, dependency, or non-text entries.\n`,
+    );
+  if (!sources.length) throw new Error("Folder contains no supported text files.");
   return sources;
 }
 
@@ -87,29 +101,49 @@ try {
   let mode = "single",
     format = "json",
     output = null,
-    failOnHigh = false,
     calibration = false,
     useStdin = false,
     failOn = null,
-    configPath = null;
+    configPath = null,
+    optionsEnded = false;
   for (let index = 0; index < args.length; index++) {
-    const arg = args[index];
-    if (arg === "--compare" || arg === "--folder" || arg === "--calibration") {
+    let arg = args[index];
+    let inlineValue = null;
+    if (!optionsEnded && arg === "--") {
+      optionsEnded = true;
+      continue;
+    }
+    if (!optionsEnded && arg.startsWith("--") && arg.includes("=")) {
+      const eq = arg.indexOf("=");
+      inlineValue = arg.slice(eq + 1);
+      arg = arg.slice(0, eq);
+    }
+    const takeValue = () => {
+      const value = inlineValue ?? args[++index];
+      if (!value || (inlineValue === null && value.startsWith("--")))
+        throw new Error(`Missing value for ${arg}`);
+      return value;
+    };
+    if (optionsEnded) paths.push(arg);
+    else if (
+      inlineValue !== null &&
+      !["--fail-on", "--config", "--format", "--output"].includes(arg)
+    )
+      throw new Error(`Unknown option: ${arg}`);
+    else if (arg === "--compare" || arg === "--folder" || arg === "--calibration") {
       if (mode !== "single" || calibration) throw new Error("Choose only one review mode.");
       if (arg === "--calibration") calibration = true;
       else mode = arg === "--compare" ? "compare" : "package";
     } else if (arg === "--stdin") useStdin = true;
     else if (arg === "--fail-on" || arg === "--config") {
-      const value = args[++index];
-      if (!value || value.startsWith("--")) throw new Error(`Missing value for ${arg}`);
+      const value = takeValue();
       if (arg === "--fail-on") failOn = value;
       else configPath = value;
     } else if (arg === "--format" || arg === "--output") {
-      const value = args[++index];
-      if (!value || value.startsWith("--")) throw new Error(`Missing value for ${arg}`);
+      const value = takeValue();
       if (arg === "--format") format = value;
       else output = value;
-    } else if (arg === "--fail-on-high") failOnHigh = true;
+    } else if (arg === "--fail-on-high") failOn = "high";
     else if (arg.startsWith("--")) throw new Error(`Unknown option: ${arg}`);
     else paths.push(arg);
   }
@@ -129,22 +163,31 @@ try {
       config.failOn !== "medium"
     )
       throw new Error('Config "failOn" must be "high", "medium", or null.');
-    if ("failOn" in config && config.failOn !== null && failOn === null && !failOnHigh)
-      failOn = config.failOn;
+    if ("failOn" in config && config.failOn !== null && failOn === null) failOn = config.failOn;
   }
-  if (failOnHigh) failOn = "high";
   if (failOn !== null && !["high", "medium"].includes(failOn))
     throw new Error("--fail-on must be high or medium.");
   if (useStdin && (calibration || mode !== "single" || paths.length))
     throw new Error(
       "--stdin reviews one piped file only; do not combine it with paths or other modes.",
     );
-  if (calibration && (paths.length || format !== "json" || failOnHigh || failOn !== null))
+  if (calibration && (paths.length || format !== "json" || failOn !== null))
     throw new Error(
       "Calibration accepts JSON output only, without file inputs or a high-suspicion gate.",
     );
   if (!calibration && !useStdin && paths.length !== (mode === "compare" ? 2 : 1))
     throw new Error("Wrong number of input paths. Use --help.");
+  if (mode === "package" && output) {
+    const folderRoot = await realpath(resolve(paths[0]));
+    const outputDir = await realpath(resolve(dirname(output))).catch(() =>
+      resolve(dirname(output)),
+    );
+    const inside = relative(folderRoot, resolve(outputDir, basename(output)));
+    if (inside === "" || (!inside.startsWith(`..${sep}`) && inside !== ".."))
+      throw new Error(
+        "Output must not be inside the reviewed folder; it would be reviewed on the next run.",
+      );
+  }
   let text,
     hasHigh = false;
   if (calibration) text = JSON.stringify(evaluateCalibration(), null, 2);
@@ -158,6 +201,7 @@ try {
         if (stdinBytes > INPUT_LIMITS.fileBytes) throw new Error("Stdin exceeds 256 KiB.");
         chunks.push(chunk);
       }
+      if (stdinBytes === 0) throw new Error("Stdin was empty; nothing to review.");
       stdinText = new TextDecoder("utf-8", { fatal: true }).decode(Buffer.concat(chunks));
     }
     const loaded = useStdin

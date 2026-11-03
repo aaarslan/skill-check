@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   analyzeReview,
   type AnalyzeOptions,
@@ -85,6 +85,7 @@ export function analyzeReviewAsync(
   mode: ReviewMode,
   sources: readonly ReviewSource[],
   options: AnalyzeOptions = {},
+  signal?: AbortSignal,
 ): Promise<Review> {
   let active = getWorker();
   if (!active) return Promise.resolve().then(() => analyzeReview(mode, sources, options));
@@ -106,6 +107,22 @@ export function analyzeReviewAsync(
       }, REQUEST_TIMEOUT_MS),
     };
     pending.set(id, entry);
+    signal?.addEventListener(
+      "abort",
+      () => {
+        if (pending.delete(id)) {
+          if (entry.timer) clearTimeout(entry.timer);
+          entry.rejectRaw(new Error("Analysis aborted."));
+        }
+      },
+      { once: true },
+    );
+    if (signal?.aborted) {
+      pending.delete(id);
+      if (entry.timer) clearTimeout(entry.timer);
+      entry.rejectRaw(new Error("Analysis aborted."));
+      return;
+    }
     active.postMessage({ id, mode, sources, options });
   });
 }
@@ -133,22 +150,29 @@ export function useAsyncReview(
     [mode, sources, stableOptions],
   );
   const [state, setState] = useState<{ signature: string; review: Review } | null>(null);
+  const completedSignatureRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!sources.length || typeof Worker === "undefined") return;
+    if (completedSignatureRef.current === signature) return;
     let cancelled = false;
-    void analyzeReviewAsync(mode, sources, stableOptions)
+    const controller = new AbortController();
+    void analyzeReviewAsync(mode, sources, stableOptions, controller.signal)
       .then((review) => {
+        completedSignatureRef.current = signature;
         if (!cancelled) setState({ signature, review });
       })
       .catch(() => {
         if (cancelled) return;
         try {
-          setState({ signature, review: analyzeReview(mode, sources, stableOptions) });
+          const review = analyzeReview(mode, sources, stableOptions);
+          completedSignatureRef.current = signature;
+          setState({ signature, review });
         } catch {}
       });
     return () => {
       cancelled = true;
+      controller.abort();
     };
   }, [mode, sources, signature, stableOptions]);
 

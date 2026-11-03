@@ -79,17 +79,25 @@ describe("useAsyncReview with a worker", () => {
     // The stale review stays mounted (no empty flash) while pending.
     expect(result.current.review?.documents[0]?.file.content).toContain("First");
     expect(result.current.pending).toBe(true);
-    // Superseding again while that request is still in flight restarts the
-    // busy worker instead of queueing behind the stale snapshot.
+    // Superseding again while that request is still in flight aborts its
+    // pending entry instead of queueing behind the stale snapshot.
     const third = [{ path: "SKILL.md", content: "# Third\nDo it a third way." }];
     rerender({ sources: third });
-    expect(firstWorker.terminated).toBe(true);
+    // Aborting the superseded request frees the pending slot, so the worker
+    // is reused rather than restarted.
+    expect(firstWorker.terminated).toBe(false);
     const thirdWorker = FakeWorker.instances.at(-1)!;
-    expect(thirdWorker).not.toBe(firstWorker);
+    expect(thirdWorker).toBe(firstWorker);
     expect(result.current.review?.documents[0]?.file.content).toContain("First");
     await act(async () => thirdWorker.respond(syncAnalyze("single", third)));
     expect(result.current.review?.documents[0]?.file.content).toContain("Third");
     expect(result.current.pending).toBe(false);
+    // Same content in a fresh array must not re-post work or swap the review.
+    const postedId = FakeWorker.instances.at(-1)?.lastMessage?.id;
+    const before = result.current.review;
+    rerender({ sources: [{ path: "SKILL.md", content: "# Third\nDo it a third way." }] });
+    expect(result.current.review).toBe(before);
+    expect(FakeWorker.instances.at(-1)?.lastMessage?.id).toBe(postedId);
     vi.unstubAllGlobals();
   });
 });

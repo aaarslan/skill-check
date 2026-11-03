@@ -17,9 +17,9 @@ export function SpecPanel({ slotLabel, findings }: SpecPanelProps) {
         </p>
       ) : (
         <ul className={styles.list}>
-          {findings.map((finding) => (
+          {findings.map((finding, findingIndex) => (
             <li
-              key={`${finding.ruleId}:${finding.location?.line ?? "doc"}:${finding.message}`}
+              key={`${findingIndex}:${finding.ruleId}:${finding.location?.line ?? "doc"}:${finding.message}`}
               className={styles.item}
             >
               <div className={styles.itemHeader}>

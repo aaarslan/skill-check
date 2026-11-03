@@ -81,6 +81,18 @@ export function validateSkillDocument(
       ),
     );
   }
+  for (const key of fm.duplicateFields) {
+    out.push(
+      finding(
+        "duplicate-field",
+        "medium",
+        `Frontmatter field "${key}" is declared more than once`,
+        "Keep a single declaration; YAML loaders disagree on duplicate keys.",
+        lineOf(key),
+        key,
+      ),
+    );
+  }
   for (const key of fm.invalidFields) {
     out.push(
       finding(
@@ -94,8 +106,20 @@ export function validateSkillDocument(
     );
   }
   const nonString = new Set(fm.nonStringFields);
-  const rawName = fm.fields["name"];
-  if (rawName !== undefined && nonString.has("name")) {
+  const rawName = fm.fields["name"] === "" ? undefined : fm.fields["name"];
+  if (fm.fields["name"] === "" && !fm.nonStringFields.includes("name")) {
+    out.push(
+      finding(
+        "empty-field",
+        "high",
+        'Frontmatter "name" is present but empty',
+        "Give the skill a name matching its directory.",
+        lineOf("name"),
+        "name",
+      ),
+    );
+  }
+  if (fm.fields["name"] !== undefined && nonString.has("name")) {
     out.push(
       finding(
         "non-string-field",
@@ -103,13 +127,13 @@ export function validateSkillDocument(
         'Frontmatter "name" must be a string, not a number, boolean, or null',
         "Quote the name so YAML loads it as a string matching the directory.",
         lineOf("name"),
-        rawName,
+        fm.fields["name"] ?? "",
       ),
     );
   }
   const name = nonString.has("name") ? undefined : rawName;
   if (!name) {
-    if (!nonString.has("name")) {
+    if (!nonString.has("name") && fm.fields["name"] !== "") {
       out.push(
         finding(
           "name-missing",
@@ -132,7 +156,7 @@ export function validateSkillDocument(
           name.slice(0, 80),
         ),
       );
-    if (!/^[a-z0-9-]+$/u.test(name))
+    if (!/^[\p{Ll}\p{Nd}-]+$/u.test(name))
       out.push(
         finding(
           "name-charset",
@@ -179,8 +203,20 @@ export function validateSkillDocument(
         ),
       );
   }
-  const rawDescription = fm.fields["description"];
-  if (rawDescription !== undefined && nonString.has("description")) {
+  const rawDescription = fm.fields["description"] === "" ? undefined : fm.fields["description"];
+  if (fm.fields["description"] === "" && !fm.nonStringFields.includes("description")) {
+    out.push(
+      finding(
+        "empty-field",
+        "high",
+        'Frontmatter "description" is present but empty',
+        "Describe what the skill does and when to use it.",
+        lineOf("description"),
+        "description",
+      ),
+    );
+  }
+  if (fm.fields["description"] !== undefined && nonString.has("description")) {
     out.push(
       finding(
         "non-string-field",
@@ -188,13 +224,13 @@ export function validateSkillDocument(
         'Frontmatter "description" must be a string, not a number, boolean, or null',
         "Quote the description so YAML loads it as a string.",
         lineOf("description"),
-        rawDescription,
+        fm.fields["description"] ?? "",
       ),
     );
   }
   const description = nonString.has("description") ? undefined : rawDescription;
   if (!description) {
-    if (!nonString.has("description")) {
+    if (!nonString.has("description") && fm.fields["description"] !== "") {
       out.push(
         finding(
           "description-missing",
@@ -229,7 +265,20 @@ export function validateSkillDocument(
         ),
       );
   }
-  const compatibility = fm.fields["compatibility"];
+  for (const key of fm.nonStringFields) {
+    if (key === "name" || key === "description") continue;
+    out.push(
+      finding(
+        "non-string-field",
+        "medium",
+        `Frontmatter "${key}" must be a string, not a number, boolean, null, or collection`,
+        "Quote the value so YAML loads it as a string.",
+        lineOf(key.replace(/^metadata\./u, "metadata")),
+        key,
+      ),
+    );
+  }
+  const compatibility = nonString.has("compatibility") ? undefined : fm.fields["compatibility"];
   if (compatibility !== undefined && (compatibility.length === 0 || charCount(compatibility) > 500))
     out.push(
       finding(

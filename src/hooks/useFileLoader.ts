@@ -10,9 +10,9 @@ import type { LoadedFile } from "../domain/shared/types.ts";
 
 export type FileLoadState =
   | { readonly status: "idle" }
-  | { readonly status: "loading" }
+  | { readonly status: "loading"; readonly file: LoadedFile | null }
   | { readonly status: "loaded"; readonly file: LoadedFile }
-  | { readonly status: "error"; readonly message: string };
+  | { readonly status: "error"; readonly message: string; readonly file: LoadedFile | null };
 
 const ACCEPTED_EXTENSIONS = [".md", ".markdown", ".txt"];
 const MAX_FILE_SIZE_BYTES = INPUT_LIMITS.fileBytes;
@@ -35,6 +35,13 @@ export function useFileLoader(): FileLoaderApi {
   // Guards against a stale file-read promise (from a superseded load) overwriting
   // the state set by a later load/clear call.
   const requestIdRef = useRef(0);
+  const lastFileRef = useRef<LoadedFile | null>(null);
+  const fail = (message: string) =>
+    setState({ status: "error", message, file: lastFileRef.current });
+  const succeed = (file: LoadedFile) => {
+    lastFileRef.current = file;
+    setState({ status: "loaded", file });
+  };
   useEffect(
     () => () => {
       requestIdRef.current++;
@@ -46,15 +53,15 @@ export function useFileLoader(): FileLoaderApi {
     const requestId = ++requestIdRef.current;
 
     if (!hasAcceptedExtension(file.name)) {
-      setState({ status: "error", message: `"${file.name}" isn't a .md or .txt file.` });
+      fail(`"${file.name}" isn't a .md or .txt file.`);
       return;
     }
     if (file.size > MAX_FILE_SIZE_BYTES) {
-      setState({ status: "error", message: `"${file.name}" is too large (max 256 KiB).` });
+      fail(`"${file.name}" is too large (max 256 KiB).`);
       return;
     }
 
-    setState({ status: "loading" });
+    setState({ status: "loading", file: lastFileRef.current });
     void (async () => {
       try {
         let bytes: ArrayBuffer;
@@ -70,16 +77,10 @@ export function useFileLoader(): FileLoaderApi {
           throw new Error(`"${file.name}" must be valid UTF-8 text.`);
         }
         if (requestIdRef.current !== requestId) return;
-        setState({
-          status: "loaded",
-          file: toLoadedFile(validateContent(content), normalizePackagePath(file.name)),
-        });
+        succeed(toLoadedFile(validateContent(content), normalizePackagePath(file.name)));
       } catch (cause) {
         if (requestIdRef.current !== requestId) return;
-        setState({
-          status: "error",
-          message: cause instanceof Error ? cause.message : "Invalid text file.",
-        });
+        fail(cause instanceof Error ? cause.message : "Invalid text file.");
       }
     })();
   }, []);
@@ -87,17 +88,15 @@ export function useFileLoader(): FileLoaderApi {
   const loadFromText = useCallback((text: string) => {
     requestIdRef.current++;
     try {
-      setState({ status: "loaded", file: toLoadedFile(validateContent(text), null) });
+      succeed(toLoadedFile(validateContent(text), null));
     } catch (cause) {
-      setState({
-        status: "error",
-        message: cause instanceof Error ? cause.message : "Invalid text.",
-      });
+      fail(cause instanceof Error ? cause.message : "Invalid text.");
     }
   }, []);
 
   const clear = useCallback(() => {
     requestIdRef.current++;
+    lastFileRef.current = null;
     setState({ status: "idle" });
   }, []);
 

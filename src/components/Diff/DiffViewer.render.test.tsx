@@ -71,3 +71,26 @@ describe("DiffViewer repeat navigation and focus", () => {
     expect(container.contains(document.activeElement)).toBe(true);
   });
 });
+
+describe("DiffViewer navigation reset", () => {
+  it("resets the change counter when the diff prop changes", () => {
+    const onChange = vi.fn();
+    const { rerender } = render(
+      <DiffViewer
+        diff={diffLines("a\nb\nc", "a2\nb2\nc2")}
+        ignoreWhitespace={false}
+        onIgnoreWhitespaceChange={onChange}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Next change" }));
+    expect(screen.getByText(/Change 1 of/u)).toBeInTheDocument();
+    rerender(
+      <DiffViewer
+        diff={diffLines("a\nb", "a\nb2")}
+        ignoreWhitespace={false}
+        onIgnoreWhitespaceChange={onChange}
+      />,
+    );
+    expect(screen.queryByText(/Change 1 of/u)).not.toBeInTheDocument();
+  });
+});

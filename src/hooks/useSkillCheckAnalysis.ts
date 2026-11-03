@@ -30,8 +30,8 @@ export interface SkillCheckAnalysis {
 export function useSkillCheckAnalysis(ignoreWhitespace: boolean): SkillCheckAnalysis {
   const original = useFileLoader();
   const candidate = useFileLoader();
-  const loadedOriginal = original.state.status === "loaded" ? original.state.file : null;
-  const loadedCandidate = candidate.state.status === "loaded" ? candidate.state.file : null;
+  const loadedOriginal = original.state.status === "idle" ? null : original.state.file;
+  const loadedCandidate = candidate.state.status === "idle" ? null : candidate.state.file;
   const originalFile = useDeferredValue(loadedOriginal);
   const candidateFile = useDeferredValue(loadedCandidate);
   const sources = useMemo(

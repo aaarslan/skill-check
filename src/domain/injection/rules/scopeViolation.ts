@@ -1,5 +1,5 @@
 import type { AnalyzableDocument } from "../../shared/markdown.ts";
-import { scanPatterns, type PatternSpec } from "../scanPatterns.ts";
+import { scanCrossLinePatterns, scanPatterns, type PatternSpec } from "../scanPatterns.ts";
 import type { InjectionFinding, InjectionRule } from "../types.ts";
 
 const RULE_ID = "injection/scope-violation";
@@ -45,6 +45,9 @@ export const scopeViolationRule: InjectionRule = {
   description:
     "Detects instructions that claim priority over, or fall outside, the skill's stated scope.",
   evaluate(doc: AnalyzableDocument): InjectionFinding[] {
-    return scanPatterns(doc, RULE_ID, "scope-violation", "high", PATTERNS);
+    return [
+      ...scanPatterns(doc, RULE_ID, "scope-violation", "high", PATTERNS),
+      ...scanCrossLinePatterns(doc, RULE_ID, "scope-violation", "high", PATTERNS),
+    ];
   },
 };

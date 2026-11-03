@@ -30,6 +30,17 @@
 - Diff change navigation scrolls after windowed rows expand.
 - Root SKILL.md name checks use the selected folder name (CLI and browser).
 - SARIF artifact URIs map to the real reviewed files.
+- Pre-review bug hunt (four adversarial passes): control-character and
+  chunked/leetspeak evasion in normalization, duplicate finding ids,
+  cross-line coverage for impersonation/secret/scope/data exfiltration,
+  trailing HTML-comment quadratic, closed-ATX/setext/unicode heading slugs,
+  fence closing rules and indented code blocks, same-line contradictions,
+  query-bearing cross-file links, duplicate/alias frontmatter keys,
+  folder reviews skip hidden/dependency/non-text entries instead of
+  aborting, CLI argument forms (`--`, `--flag=value`, last-wins gates),
+  output-in-folder refusal, empty-stdin refusal, failed loads preserving
+  the last good analysis, diff navigation reset, and signature-deduped
+  re-analysis.
 - Third review round: YAML collections in string fields and standalone
   comment lines in frontmatter; the `rm` flag regexes replaced with a linear
   single-pass tokenizer (the remaining quadratic case).

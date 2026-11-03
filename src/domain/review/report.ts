@@ -247,7 +247,7 @@ export function importDecisions(jsonText: string, review: Review): Decisions {
     if (status !== "open" && status !== "reviewed" && status !== "dismissed") continue;
     decisions[finding.id] = {
       status,
-      note: typeof finding.decision?.note === "string" ? finding.decision.note.slice(0, 4000) : "",
+      note: typeof finding.decision?.note === "string" ? finding.decision.note : "",
     };
   }
   return decisions;

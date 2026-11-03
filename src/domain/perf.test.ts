@@ -86,3 +86,15 @@ describe("prepared quoted checker matches the per-match implementation", () => {
     expect(isDescriptiveFraming(far, far.length - 7)).toBe(false);
   });
 });
+
+describe("trailing HTML-comment opens", () => {
+  it("stays near-linear when only the first comment closes", () => {
+    const { ms } = timed(() => detectInjection("-->" + "<!--".repeat(64000)));
+    expect(ms).toBeLessThan(BUDGET_MS);
+  });
+  it("handles a 4000-line benign file with cross-line scanning", () => {
+    const content = Array.from({ length: 4000 }, (_, i) => `line ${i} some prose here`).join("\n");
+    const { ms } = timed(() => detectInjection(content));
+    expect(ms).toBeLessThan(BUDGET_MS);
+  });
+});

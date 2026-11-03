@@ -236,3 +236,54 @@ describe("comment-only field values", () => {
     expect(fm.fields["description"]).toBe("Helps out. Use when demoing.");
   });
 });
+
+describe("spec fidelity (bug hunt)", () => {
+  it("accepts unicode lowercase names", () => {
+    expect(
+      validateSkillDocument(
+        "---\nname: café-data\ndescription: Helps. Use when demoing.\n---\n",
+        "café-data/SKILL.md",
+      ),
+    ).toEqual([]);
+  });
+  it("flags non-string license, compatibility, allowed-tools, and metadata values", () => {
+    const base = "---\nname: demo\ndescription: Helps. Use when demoing.\n";
+    for (const extra of [
+      "license: 123\n",
+      "compatibility: true\n",
+      "allowed-tools: [Read, Bash]\n",
+      "metadata:\n  version: 1.0\n",
+    ]) {
+      const rules = validateSkillDocument(`${base}${extra}---\n`, "SKILL.md").map((f) => f.ruleId);
+      expect(rules).toContain("spec/non-string-field");
+    }
+  });
+  it("flags duplicate keys, unterminated quotes, aliases; strips anchors", () => {
+    expect(
+      validateSkillDocument(
+        "---\nname: demo\nname: other\ndescription: Helps. Use when demoing.\n---\n",
+        "SKILL.md",
+      ).map((f) => f.ruleId),
+    ).toContain("spec/duplicate-field");
+    expect(
+      validateSkillDocument(
+        '---\nname: "oops\ndescription: Helps. Use when demoing.\n---\nbody\n',
+        "SKILL.md",
+      ).map((f) => f.ruleId),
+    ).toContain("spec/frontmatter-invalid");
+    expect(
+      validateSkillDocument("---\nname: demo\ndescription: *elsewhere\n---\n", "SKILL.md").map(
+        (f) => f.ruleId,
+      ),
+    ).toContain("spec/frontmatter-invalid");
+    expect(parseFrontmatter("---\nname: &n demo\n---\n").fields["name"]).toBe("demo");
+  });
+  it("distinguishes present-but-empty from missing", () => {
+    const rules = validateSkillDocument(
+      '---\nname: ""\ndescription: Helps. Use when demoing.\n---\n',
+      "SKILL.md",
+    ).map((f) => f.ruleId);
+    expect(rules).toContain("spec/empty-field");
+    expect(rules).not.toContain("spec/name-missing");
+  });
+});

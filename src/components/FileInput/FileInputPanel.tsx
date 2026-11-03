@@ -8,7 +8,14 @@ import {
   FileText,
   Trash,
 } from "@phosphor-icons/react";
-import { useEffect, useState, type ChangeEvent, type DragEvent } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type DragEvent,
+  type KeyboardEvent,
+} from "react";
 import type { FileLoaderApi } from "../../hooks/useFileLoader.ts";
 import { formatBytes } from "../format.ts";
 import styles from "./FileInputPanel.module.css";
@@ -25,15 +32,43 @@ export function FileInputPanel({ slotLabel, slotKey, loader }: FileInputPanelPro
   const [draftText, setDraftText] = useState("");
   const textareaId = `${slotKey}-editor`;
   const descriptionId = `${slotKey}-description`;
-  const isLoaded = loader.state.status === "loaded";
-  const loadedContent = isLoaded ? loader.state.file.content : null;
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const expandButtonRef = useRef<HTMLButtonElement | null>(null);
+  const lastSyncedRef = useRef<string | null>(null);
+  const wasExpandedRef = useRef(false);
+  const currentFile = loader.state.status === "idle" ? null : loader.state.file;
+  const isLoaded = currentFile !== null;
+  const loadedContent = currentFile?.content ?? null;
   const hasUnappliedChanges = isLoaded && draftText !== loadedContent;
 
   useEffect(() => {
-    if (loader.state.status === "loaded") {
-      setDraftText(loader.state.file.content);
+    if (!currentFile) {
+      lastSyncedRef.current = null;
+      return;
     }
-  }, [loader.state]);
+    setDraftText((previous) => {
+      const dirty = lastSyncedRef.current !== null && previous !== lastSyncedRef.current;
+      return dirty ? previous : currentFile.content;
+    });
+    lastSyncedRef.current = currentFile.content;
+  }, [currentFile]);
+
+  useEffect(() => {
+    if (isExpanded) {
+      wasExpandedRef.current = true;
+      textareaRef.current?.focus();
+    } else if (wasExpandedRef.current) {
+      wasExpandedRef.current = false;
+      expandButtonRef.current?.focus();
+    }
+  }, [isExpanded]);
+
+  const handleEditorKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (isExpanded && event.key === "Escape") {
+      event.preventDefault();
+      setIsExpanded(false);
+    }
+  };
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -53,7 +88,7 @@ export function FileInputPanel({ slotLabel, slotKey, loader }: FileInputPanelPro
   };
 
   const handleLoadPastedText = () => {
-    if (draftText.trim().length > 0) {
+    if (draftText.length > 0) {
       loader.loadFromText(draftText);
       setIsExpanded(false);
     }
@@ -61,10 +96,11 @@ export function FileInputPanel({ slotLabel, slotKey, loader }: FileInputPanelPro
 
   const handleClear = () => {
     loader.clear();
+    lastSyncedRef.current = null;
     setDraftText("");
   };
 
-  const applyButtonDisabled = draftText.trim().length === 0 || (isLoaded && !hasUnappliedChanges);
+  const applyButtonDisabled = draftText.length === 0 || (isLoaded && !hasUnappliedChanges);
   const applyButtonLabel = isLoaded
     ? hasUnappliedChanges
       ? "Apply changes"
@@ -132,15 +168,14 @@ export function FileInputPanel({ slotLabel, slotKey, loader }: FileInputPanelPro
         </>
       )}
 
-      {isLoaded && (
+      {currentFile && (
         <div className={styles.loadedInfo} aria-live="polite">
           <CheckCircle className={styles.loadedIcon} size={29} weight="fill" aria-hidden="true" />
           <div className={styles.loadedCopy}>
-            <strong>{loader.state.file.filename ?? "Pasted Markdown"}</strong>
+            <strong>{currentFile.filename ?? "Pasted Markdown"}</strong>
             <span>
-              {formatBytes(loader.state.file.sizeBytes)} ·{" "}
-              {loader.state.file.wordCount.toLocaleString()} words ·{" "}
-              {loader.state.file.lineCount.toLocaleString()} lines
+              {formatBytes(currentFile.sizeBytes)} · {currentFile.wordCount.toLocaleString()} words
+              · {currentFile.lineCount.toLocaleString()} lines
             </span>
           </div>
           <label className={styles.replaceButton}>
@@ -161,12 +196,20 @@ export function FileInputPanel({ slotLabel, slotKey, loader }: FileInputPanelPro
         </div>
       )}
 
-      <div className={styles.textEntry} data-expanded={isExpanded}>
+      <div
+        className={styles.textEntry}
+        data-expanded={isExpanded}
+        role={isExpanded ? "dialog" : undefined}
+        aria-modal={isExpanded || undefined}
+        aria-label={isExpanded ? `${slotLabel} Markdown editor` : undefined}
+        onKeyDown={handleEditorKeyDown}
+      >
         <div className={styles.editorChrome}>
           <span className={styles.lineNumbers} aria-hidden="true">
             1<br />2
           </span>
           <textarea
+            ref={textareaRef}
             id={textareaId}
             className={styles.textarea}
             value={draftText}
@@ -179,6 +222,7 @@ export function FileInputPanel({ slotLabel, slotKey, loader }: FileInputPanelPro
             Markdown
           </span>
           <button
+            ref={expandButtonRef}
             className={styles.expandButton}
             type="button"
             aria-label={isExpanded ? "Collapse Markdown editor" : "Expand Markdown editor"}

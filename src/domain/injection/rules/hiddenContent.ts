@@ -51,7 +51,9 @@ export const hiddenContentRule: InjectionRule = {
     let scannedLine = 1;
     let scannedLineStart = 0;
     const checkersByLine = new Map<number, ReturnType<typeof prepareQuotedChecker>>();
-    for (const match of doc.content.includes("-->") ? doc.content.matchAll(HTML_COMMENT) : []) {
+    const lastClose = doc.content.lastIndexOf("-->");
+    const commentRegion = lastClose < 0 ? "" : doc.content.slice(0, lastClose + 3);
+    for (const match of commentRegion.matchAll(HTML_COMMENT)) {
       const commentBody = match[1] ?? "";
       const matchOffset = match.index ?? 0;
       for (let i = scannedOffset; i < matchOffset; i++) {
@@ -71,7 +73,7 @@ export const hiddenContentRule: InjectionRule = {
       }
       const quoted = quotedAt(matchOffset - scannedLineStart, match[0].length);
       findings.push({
-        id: `${RULE_ID}:${lineNumber}:${match.index ?? 0}`,
+        id: `${RULE_ID}:${lineNumber}:comment:${matchOffset - scannedLineStart}`,
         ruleId: RULE_ID,
         category: "hidden-content",
         suspicion: downgradeIfQuoted(suspicion, quoted),

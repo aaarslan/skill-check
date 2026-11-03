@@ -1,5 +1,5 @@
 import type { AnalyzableDocument } from "../../shared/markdown.ts";
-import { scanPatterns, type PatternSpec } from "../scanPatterns.ts";
+import { scanCrossLinePatterns, scanPatterns, type PatternSpec } from "../scanPatterns.ts";
 import type { InjectionFinding, InjectionRule } from "../types.ts";
 
 const RULE_ID = "injection/data-exfiltration";
@@ -48,6 +48,9 @@ export const dataExfiltrationRule: InjectionRule = {
   description:
     "Detects requests to read unrelated files, environment variables, browser storage, or clipboard data.",
   evaluate(doc: AnalyzableDocument): InjectionFinding[] {
-    return scanPatterns(doc, RULE_ID, "data-exfiltration", "high", PATTERNS);
+    return [
+      ...scanPatterns(doc, RULE_ID, "data-exfiltration", "high", PATTERNS),
+      ...scanCrossLinePatterns(doc, RULE_ID, "data-exfiltration", "high", PATTERNS),
+    ];
   },
 };

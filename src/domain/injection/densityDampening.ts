@@ -29,8 +29,12 @@ export function applyCategoryDensityDampening(
   }
 
   const countByCategory = new Map<InjectionCategory, number>();
+  const linesByCategory = new Map<InjectionCategory, Set<number>>();
   for (const finding of findings) {
     countByCategory.set(finding.category, (countByCategory.get(finding.category) ?? 0) + 1);
+    const lines = linesByCategory.get(finding.category) ?? new Set<number>();
+    lines.add(finding.location.line);
+    linesByCategory.set(finding.category, lines);
   }
 
   return findings.map((finding) => {
@@ -44,7 +48,7 @@ export function applyCategoryDensityDampening(
     return {
       ...finding,
       suspicion: downgradeSuspicionTier(finding.suspicion),
-      rationale: `${finding.rationale} (this pattern recurs across ${count} lines of this document, which reads as topical vocabulary rather than an isolated attempt, so suspicion was reduced)`,
+      rationale: `${finding.rationale} (this pattern recurs in ${count} findings across ${linesByCategory.get(finding.category)?.size ?? 1} lines of this document, which reads as topical vocabulary rather than an isolated attempt, so suspicion was reduced)`,
     };
   });
 }

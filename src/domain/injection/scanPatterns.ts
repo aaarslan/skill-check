@@ -42,7 +42,7 @@ export function scanPatterns(
     const normalizedLine = normalizeForMatching(line);
     const lineWasNormalized = normalizedLine !== line;
 
-    for (const spec of patterns) {
+    patterns.forEach((spec, specIndex) => {
       const globalPattern = toGlobal(spec.pattern);
       const baseSuspicion = spec.suspicion ?? defaultSuspicion;
       let matchedRaw = false;
@@ -58,7 +58,7 @@ export function scanPatterns(
           descriptive,
         );
         findings.push({
-          id: `${ruleId}:${lineNumber}:${match.index ?? 0}`,
+          id: `${ruleId}:${lineNumber}:${specIndex}:${match.index ?? 0}`,
           ruleId,
           category,
           suspicion,
@@ -73,11 +73,11 @@ export function scanPatterns(
       // a match that only appears after normalizing lookalike characters or
       // collapsing separators is itself evidence of deliberate obfuscation.
       if (matchedRaw || !lineWasNormalized) {
-        continue;
+        return;
       }
       const normalizedMatch = toGlobal(spec.pattern).exec(normalizedLine);
       if (!normalizedMatch) {
-        continue;
+        return;
       }
       const quoted = isLikelyQuotedContext(
         doc,
@@ -88,7 +88,7 @@ export function scanPatterns(
       );
       const descriptive = isDescriptiveFraming(normalizedLine, normalizedMatch.index);
       findings.push({
-        id: `${ruleId}:${lineNumber}:obfuscated:${normalizedMatch.index}`,
+        id: `${ruleId}:${lineNumber}:obfuscated:${specIndex}:${normalizedMatch.index}`,
         ruleId,
         category,
         suspicion: downgradeIfDescriptive(
@@ -100,13 +100,13 @@ export function scanPatterns(
         rationale: `${spec.rationale} (only matched after normalizing lookalike characters or separators — likely obfuscated)`,
         isQuotedExample: quoted,
       });
-    }
+    });
   });
 
   return findings;
 }
 
-const CROSS_LINE_WINDOW_SIZES = [2, 3];
+const CROSS_LINE_WINDOW_SIZES = [2, 3, 4];
 
 interface CrossLineCandidate {
   readonly start: number;
@@ -132,8 +132,10 @@ export function scanCrossLinePatterns(
   const findings: InjectionFinding[] = [];
   const codeLines = codeBlockLineSet(doc);
 
-  for (const spec of patterns) {
+  patterns.forEach((spec, specIndex) => {
     const candidates: CrossLineCandidate[] = [];
+    const singleLinePattern = new RegExp(spec.pattern.source, spec.pattern.flags.replace("g", ""));
+    const lineMatchesAlone = doc.lines.map((line) => singleLinePattern.test(line));
 
     for (const windowSize of CROSS_LINE_WINDOW_SIZES) {
       for (let start = 0; start + windowSize <= doc.lines.length; start++) {
@@ -145,11 +147,10 @@ export function scanCrossLinePatterns(
         if (nonEmptyCount < 2) {
           continue;
         }
-        const singleLinePattern = new RegExp(
-          spec.pattern.source,
-          spec.pattern.flags.replace("g", ""),
-        );
-        if (windowLines.some((line) => singleLinePattern.test(line))) {
+        if (lineMatchesAlone.slice(start, start + windowSize).some(Boolean)) {
+          continue;
+        }
+        if (windowLines.reduce((sum, line) => sum + line.length, 0) > 600) {
           continue;
         }
         const joined = windowLines
@@ -157,7 +158,13 @@ export function scanCrossLinePatterns(
           .join(" ")
           .replace(/\s+/gu, " ")
           .trim();
-        const match = toGlobal(spec.pattern).exec(joined);
+        let match = toGlobal(spec.pattern).exec(joined);
+        if (!match) {
+          const normalizedJoined = normalizeForMatching(joined);
+          if (normalizedJoined !== joined) {
+            match = toGlobal(spec.pattern).exec(normalizedJoined);
+          }
+        }
         if (!match) {
           continue;
         }
@@ -193,7 +200,7 @@ export function scanCrossLinePatterns(
       const quoted = isLikelyQuotedContext(doc, lineNumber, codeLines, 0, 0);
       const descriptive = isDescriptiveFraming(candidate.joined, candidate.matchIndex);
       findings.push({
-        id: `${ruleId}:${lineNumber}:cross-line-${candidate.windowSize}`,
+        id: `${ruleId}:${lineNumber}:cross-line-${specIndex}-${candidate.windowSize}`,
         ruleId,
         category,
         suspicion: downgradeIfDescriptive(downgradeIfQuoted(baseSuspicion, quoted), descriptive),
@@ -203,7 +210,7 @@ export function scanCrossLinePatterns(
         isQuotedExample: quoted,
       });
     }
-  }
+  });
 
   return findings;
 }

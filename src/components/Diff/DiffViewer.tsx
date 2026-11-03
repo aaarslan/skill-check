@@ -44,6 +44,12 @@ export function DiffViewer({ diff, ignoreWhitespace, onIgnoreWhitespaceChange }:
   const pendingScrollRef = useRef<number | null>(null);
 
   useEffect(() => {
+    setCurrentChangeIndex(-1);
+    setShowAllRows(false);
+    pendingScrollRef.current = null;
+  }, [diff]);
+
+  useEffect(() => {
     if (scrollRequest === 0) return;
     const startIndex = pendingScrollRef.current;
     if (startIndex === null) return;

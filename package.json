@@ -43,8 +43,7 @@
     "coverage": "vp test --coverage",
     "test:e2e": "node --test scripts/e2e-smoke.test.mjs",
     "test:browser": "playwright test",
-    "build:cli": "vp pack scripts/skillcheck.mjs --out-dir dist-cli --format esm --platform node",
-    "prepack": "pnpm run build:cli"
+    "build:cli": "vp pack scripts/skillcheck.mjs --out-dir dist-cli --format esm --platform node"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",

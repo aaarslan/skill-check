@@ -6,6 +6,7 @@ export interface ParsedFrontmatter {
   readonly fieldLines: Readonly<Record<string, number>>;
   readonly nonStringFields: readonly string[];
   readonly invalidFields: readonly string[];
+  readonly duplicateFields: readonly string[];
   readonly bodyStartLine: number;
 }
 
@@ -17,6 +18,7 @@ const EMPTY: ParsedFrontmatter = {
   fieldLines: {},
   nonStringFields: [],
   invalidFields: [],
+  duplicateFields: [],
   bodyStartLine: 1,
 };
 
@@ -83,7 +85,10 @@ function unquote(value: string): { value: string; invalid: boolean } {
 }
 
 export function parseFrontmatter(content: string): ParsedFrontmatter {
-  const lines = content.split("\n");
+  const lines = content
+    .replace(/^\uFEFF/u, "")
+    .split("\n")
+    .map((line) => line.replace(/\r$/u, ""));
   if (!/^---\s*$/u.test(lines[0] ?? "")) return EMPTY;
   const fields: Record<string, string> = {};
   const metadata: Record<string, string> = {};
@@ -96,9 +101,13 @@ export function parseFrontmatter(content: string): ParsedFrontmatter {
   let pendingQuote: { key: string; quote: string; text: string } | null = null;
   const nonStringFields: string[] = [];
   const invalidFields: string[] = [];
+  const duplicateFields: string[] = [];
   for (let i = 1; i < lines.length; i++) {
     const line = lines[i] ?? "";
     if (/^(---|\.\.\.)\s*$/u.test(line)) {
+      if (pendingQuote && !invalidFields.includes(pendingQuote.key)) {
+        invalidFields.push(pendingQuote.key);
+      }
       return {
         present: true,
         closed: true,
@@ -107,6 +116,7 @@ export function parseFrontmatter(content: string): ParsedFrontmatter {
         fieldLines,
         nonStringFields,
         invalidFields,
+        duplicateFields,
         bodyStartLine: i + 2,
       };
     }
@@ -149,7 +159,22 @@ export function parseFrontmatter(content: string): ParsedFrontmatter {
     }
     if (inMetadata && /^\s+\S/u.test(line)) {
       const m = /^\s+([^:]+):\s*(.*)$/u.exec(line);
-      if (m) metadata[(m[1] ?? "").trim()] = unquote(m[2] ?? "").value;
+      if (m) {
+        const metaKey = (m[1] ?? "").trim();
+        const metaRaw = (m[2] ?? "").trim();
+        const decoded = unquote(metaRaw);
+        metadata[metaKey] = decoded.value;
+        const metaQuoted = metaRaw.startsWith('"') || metaRaw.startsWith("'");
+        if (
+          metaKey &&
+          ((!metaQuoted && NON_STRING_SCALAR.test(decoded.value) && decoded.value !== "") ||
+            metaRaw.startsWith("[") ||
+            metaRaw.startsWith("{"))
+        ) {
+          nonStringFields.push(`metadata.${metaKey}`);
+        }
+        if (decoded.invalid) invalidFields.push(`metadata.${metaKey}`);
+      }
       continue;
     }
     if (inMetadata && line.trim() === "") {
@@ -169,7 +194,17 @@ export function parseFrontmatter(content: string): ParsedFrontmatter {
     const m = /^(?:"([^"]+)"|'([^']+)'|([A-Za-z][\w-]*))\s*:\s*(.*)$/u.exec(line);
     if (!m) continue;
     const key = m[1] ?? m[2] ?? m[3] ?? "";
-    const rawValue = (m[4] ?? "").trim();
+    let rawValue = (m[4] ?? "").trim();
+    if (key in fieldLines && !duplicateFields.includes(key)) duplicateFields.push(key);
+    if (rawValue.startsWith("*")) {
+      fields[key] = rawValue;
+      if (!invalidFields.includes(key)) invalidFields.push(key);
+      fieldLines[key] = i + 1;
+      plainKey = null;
+      continue;
+    }
+    const anchorOrTag = /^(?:&[\w-]+|!{1,2}[\w/-]+)\s+/u.exec(rawValue);
+    if (anchorOrTag) rawValue = rawValue.slice(anchorOrTag[0].length).trim();
     const raw = rawValue.startsWith("#") ? "" : rawValue;
     fieldLines[key] = i + 1;
     if (key === "metadata" && raw === "") {
@@ -247,6 +282,7 @@ export function parseFrontmatter(content: string): ParsedFrontmatter {
     fieldLines,
     nonStringFields,
     invalidFields,
+    duplicateFields,
     bodyStartLine: lines.length + 1,
   };
 }

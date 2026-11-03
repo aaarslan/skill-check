@@ -69,8 +69,8 @@ export function PackageReview() {
           <h3>{report.documents.length} files reviewed</h3>
           {report.spec.length > 0 && (
             <ul>
-              {report.spec.map((f) => (
-                <li key={f.ruleId + f.message}>
+              {report.spec.map((f, specIndex) => (
+                <li key={`${specIndex}:${f.ruleId}:${f.message}`}>
                   <strong>Spec:</strong> {f.message} — {f.suggestion}
                 </li>
               ))}

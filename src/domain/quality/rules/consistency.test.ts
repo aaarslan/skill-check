@@ -50,3 +50,26 @@ describe("consistency/internal-inconsistency", () => {
     expect(findings).toHaveLength(0);
   });
 });
+
+describe("consistency edge cases (bug hunt)", () => {
+  const run = (content: string) =>
+    consistencyRules.flatMap((rule) => rule.evaluate(toAnalyzableDocument(content)));
+  it("flags a same-line direct contradiction with non-overlapping spans", () => {
+    const findings = run("Always delete temporary logs but never delete temporary logs.\n").filter(
+      (f) => f.ruleId === "consistency/conflicting-imperatives",
+    );
+    expect(findings.length).toBe(1);
+  });
+  it("does not self-pair a single negated imperative", () => {
+    const findings = run("Never delete temporary logs.\n").filter(
+      (f) => f.ruleId === "consistency/conflicting-imperatives",
+    );
+    expect(findings.length).toBe(0);
+  });
+  it("counts commands after a There-are claim", () => {
+    const findings = run("There are two commands:\n\n1. alpha\n2. beta\n3. gamma\n").filter(
+      (f) => f.ruleId === "consistency/internal-inconsistency",
+    );
+    expect(findings.length).toBe(1);
+  });
+});

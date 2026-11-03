@@ -81,6 +81,7 @@ export function codeBlockLineSet(doc: AnalyzableDocument): Set<number> {
   let fenceMarker: string | null = null;
   let previousBlank = true;
   let previousIndentedCode = false;
+  let listContentIndent: number | null = null;
   doc.lines.forEach((line, index) => {
     const lineNumber = index + 1;
     const match = FENCE_PATTERN.exec(line);
@@ -92,7 +93,16 @@ export function codeBlockLineSet(doc: AnalyzableDocument): Set<number> {
         previousIndentedCode = false;
         return;
       }
-      const indentedCode = /^(?: {4}|\t)\S/u.test(line) && (previousBlank || previousIndentedCode);
+      const indent = line.length - line.trimStart().length + (line.startsWith("\t") ? 3 : 0);
+      const listMarker = /^(\s*(?:[-*+]|\d+[.)])\s+)\S/u.exec(line);
+      if (listMarker) {
+        listContentIndent = (listMarker[1] ?? "").length;
+      } else if (line.trim() !== "" && listContentIndent !== null && indent < listContentIndent) {
+        listContentIndent = null;
+      }
+      const codeThreshold = (listContentIndent ?? 0) + 4;
+      const indentedCode =
+        indent >= codeThreshold && line.trim() !== "" && (previousBlank || previousIndentedCode);
       if (indentedCode) lines.add(lineNumber);
       previousIndentedCode = indentedCode || (previousIndentedCode && line.trim() === "");
       previousBlank = line.trim() === "";

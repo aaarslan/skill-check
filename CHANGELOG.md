@@ -30,6 +30,9 @@
 - Diff change navigation scrolls after windowed rows expand.
 - Root SKILL.md name checks use the selected folder name (CLI and browser).
 - SARIF artifact URIs map to the real reviewed files.
+- Fourth review round: explicit YAML string tags (`!!str`) are honored
+  instead of inferring type from the remaining text, and indented-code
+  detection is list-relative so list continuation paragraphs stay prose.
 - Pre-review bug hunt (four adversarial passes): control-character and
   chunked/leetspeak evasion in normalization, duplicate finding ids,
   cross-line coverage for impersonation/secret/scope/data exfiltration,

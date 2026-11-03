@@ -203,8 +203,14 @@ export function parseFrontmatter(content: string): ParsedFrontmatter {
       plainKey = null;
       continue;
     }
-    const anchorOrTag = /^(?:&[\w-]+|!{1,2}[\w/-]+)\s+/u.exec(rawValue);
-    if (anchorOrTag) rawValue = rawValue.slice(anchorOrTag[0].length).trim();
+    let explicitString = false;
+    let property = /^(&[\w-]+|!![\w/-]+|!<[^>]*>|![\w/-]+)\s+/u.exec(rawValue);
+    while (property) {
+      const token = property[1] ?? "";
+      if (token === "!!str" || token === "!<tag:yaml.org,2002:str>") explicitString = true;
+      rawValue = rawValue.slice(property[0].length).trim();
+      property = /^(&[\w-]+|!![\w/-]+|!<[^>]*>|![\w/-]+)\s+/u.exec(rawValue);
+    }
     const raw = rawValue.startsWith("#") ? "" : rawValue;
     fieldLines[key] = i + 1;
     if (key === "metadata" && raw === "") {
@@ -230,6 +236,7 @@ export function parseFrontmatter(content: string): ParsedFrontmatter {
     if (decoded.invalid) invalidFields.push(key);
     if (
       !quote &&
+      !explicitString &&
       (NON_STRING_SCALAR.test(decoded.value) ||
         decoded.value.startsWith("[") ||
         decoded.value.startsWith("{"))

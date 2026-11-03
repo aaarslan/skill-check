@@ -287,3 +287,24 @@ describe("spec fidelity (bug hunt)", () => {
     expect(rules).not.toContain("spec/name-missing");
   });
 });
+
+describe("explicit YAML tags (review round 4)", () => {
+  it("treats !!str values as strings even when they look numeric", () => {
+    expect(
+      validateSkillDocument(
+        "---\nname: !!str 123\ndescription: Helps. Use when demoing.\n---\n",
+        "123/SKILL.md",
+      ),
+    ).toEqual([]);
+    expect(parseFrontmatter("---\nname: !!str 123\n---\n").fields["name"]).toBe("123");
+    expect(
+      validateSkillDocument(
+        "---\nname: !!int 123\ndescription: Helps. Use when demoing.\n---\n",
+        "SKILL.md",
+      ).map((f) => f.ruleId),
+    ).toContain("spec/non-string-field");
+    expect(
+      parseFrontmatter("---\nname: !<tag:yaml.org,2002:str> 42\n---\n").nonStringFields,
+    ).toEqual([]);
+  });
+});

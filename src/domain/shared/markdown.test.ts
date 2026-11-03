@@ -47,3 +47,14 @@ describe("heading and fence edge cases (bug hunt)", () => {
     expect(code.has(6)).toBe(false);
   });
 });
+
+describe("list-relative indented code (review round 4)", () => {
+  it("does not treat list continuation paragraphs as code", () => {
+    const doc = toAnalyzableDocument("- Follow this reference:\n\n    [Read](missing.md)\n");
+    expect(codeBlockLineSet(doc).has(3)).toBe(false);
+    const nested = toAnalyzableDocument("- Item:\n\n        code inside list\n");
+    expect(codeBlockLineSet(nested).has(3)).toBe(true);
+    const tabbed = toAnalyzableDocument("Intro.\n\n\tcode example\n");
+    expect(codeBlockLineSet(tabbed).has(3)).toBe(true);
+  });
+});

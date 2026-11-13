@@ -25,8 +25,15 @@
   background: var(--color-pressed-bg);
 }
 .workflowActions input[type="file"] {
-  max-width: 230px;
-  margin-left: 8px;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+.workflowActions label:focus-within {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 3px;
 }
 .singleInput {
   display: grid;
@@ -214,7 +221,8 @@
 
 .metricGrid {
   display: grid;
-  grid-template-columns: 1fr 0.9fr 1fr 0.68fr;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-bottom: 12px;
   gap: 10px;
   max-width: 1134px;
 }
@@ -223,10 +231,10 @@
   min-width: 0;
   min-height: 60px;
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
-  gap: 13px;
-  padding: 0 18px;
+  gap: 8px 12px;
+  padding: 12px 16px;
   border: 1px solid var(--color-border);
   border-radius: 8px;
   background: var(--color-surface-raised);
@@ -238,14 +246,13 @@
 }
 
 .metricLabel {
-  overflow: hidden;
   color: var(--color-muted);
   font-size: 13px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .metricValue {
+  grid-column: 2;
   color: var(--color-text);
   font-size: 15px;
   font-weight: 550;
@@ -254,9 +261,9 @@
 
 .tabs {
   display: flex;
+  flex-wrap: wrap;
   gap: 14px;
   margin-top: 12px;
-  overflow-x: auto;
 }
 
 .tab {

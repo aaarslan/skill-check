@@ -111,7 +111,12 @@ export function App() {
             className={mode === "single" ? styles.singleInput : styles.inputGrid}
             aria-label="File input"
           >
-            <FileInputPanel slotLabel="Original" slotKey="original" loader={original} />
+            <FileInputPanel
+              slotLabel={mode === "single" ? "File" : "Original"}
+              singleMode={mode === "single"}
+              slotKey="original"
+              loader={original}
+            />
             {mode === "compare" && (
               <FileInputPanel slotLabel="Candidate" slotKey="candidate" loader={candidate} />
             )}
@@ -119,6 +124,7 @@ export function App() {
 
           <ResultsSection
             view={view}
+            singleMode={mode === "single"}
             workflow={workflow}
             ignoreWhitespace={ignoreWhitespace}
             onIgnoreWhitespaceChange={setIgnoreWhitespace}

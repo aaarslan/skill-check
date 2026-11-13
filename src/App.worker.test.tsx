@@ -43,7 +43,7 @@ describe("worker report availability", () => {
     expect(screen.queryByRole("button", { name: /Export/u })).not.toBeInTheDocument();
     await act(async () => ControlledWorker.current.complete());
     expect(screen.getAllByRole("button", { name: /Export/u })).toHaveLength(3);
-    const original = screen.getByRole("region", { name: "Original" });
+    const original = screen.getByRole("region", { name: "File" });
     fireEvent.change(within(original).getByRole("textbox"), {
       target: { value: "# Changed\nReview changed behavior." },
     });

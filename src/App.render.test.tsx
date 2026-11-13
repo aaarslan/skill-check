@@ -7,6 +7,47 @@ const ORIGINAL_TEXT = "# Original skill\n\nReview the requested change.";
 const CANDIDATE_TEXT = "# Candidate skill\n\nReview the requested change and report findings.";
 
 describe("App", () => {
+  it("labels identical comparison scores and counts matches separately per document", () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Try review example" }));
+    expect(screen.getByText("Skill file to review")).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Overview" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Diff" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Create editable candidate" }));
+    expect(screen.getByLabelText("Quality score: 89 → 89")).toBeInTheDocument();
+    expect(screen.getByLabelText("High-suspicion matches: 1 → 1")).toBeInTheDocument();
+    expect(screen.getByText("Score change: 0 points (unchanged)")).toBeInTheDocument();
+    expect(
+      screen.getByText(/counted per file; zero is not a safety clearance/),
+    ).toBeInTheDocument();
+  });
+
+  it("shows signed score changes and per-file matches for different revisions", () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Compare revisions" }));
+    fireEvent.click(screen.getByRole("button", { name: "Try review example" }));
+    expect(screen.getByLabelText("High-suspicion matches: 1 → 0")).toBeInTheDocument();
+    expect(screen.getByText(/Score change: \+\d+ points/)).toBeInTheDocument();
+    const original = screen.getByRole("textbox", { name: "Paste Original Markdown" });
+    const candidate = screen.getByRole("textbox", { name: "Paste Candidate Markdown" });
+    const originalText = (original as HTMLTextAreaElement).value;
+    const candidateText = (candidate as HTMLTextAreaElement).value;
+    fireEvent.change(original, { target: { value: candidateText } });
+    fireEvent.click(
+      within(screen.getByRole("region", { name: "Original" })).getByRole("button", {
+        name: "Apply changes",
+      }),
+    );
+    fireEvent.change(candidate, { target: { value: originalText } });
+    fireEvent.click(
+      within(screen.getByRole("region", { name: "Candidate" })).getByRole("button", {
+        name: "Apply changes",
+      }),
+    );
+    expect(screen.getByLabelText("High-suspicion matches: 0 → 1")).toBeInTheDocument();
+    expect(screen.getByText(/Score change: -\d+ points/)).toBeInTheDocument();
+  });
+
   it("starts from an example and creates an editable revision while preserving the original", () => {
     render(<App />);
     fireEvent.click(screen.getByRole("button", { name: "Try review example" }));
@@ -35,7 +76,7 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("tab", { name: "Quality score" }));
     fireEvent.click(screen.getByRole("tab", { name: "Prompt injection" }));
     expect(screen.getByRole("button", { name: "Restore" })).toBeInTheDocument();
-    const original = screen.getByRole("region", { name: "Original" });
+    const original = screen.getByRole("region", { name: "File" });
     fireEvent.change(within(original).getByRole("textbox"), {
       target: { value: `${SAMPLE_ORIGINAL}\nNew context.` },
     });
@@ -63,15 +104,15 @@ describe("App", () => {
     render(<App />);
     fireEvent.click(screen.getByRole("button", { name: "Try review example" }));
     fireEvent.click(screen.getByRole("tab", { name: "Spec compliance" }));
-    expect(screen.getByText("Original: Agent Skills spec")).toBeInTheDocument();
+    expect(screen.getByText("File: Agent Skills spec")).toBeInTheDocument();
   });
 
   it("shows quality analysis after loading only one file", () => {
     render(<App />);
 
-    const originalPanel = screen.getByRole("region", { name: "Original" });
+    const originalPanel = screen.getByRole("region", { name: "File" });
     const originalEditor = within(originalPanel).getByRole("textbox", {
-      name: "Paste Original Markdown",
+      name: "Paste File Markdown",
     });
 
     fireEvent.change(originalEditor, { target: { value: ORIGINAL_TEXT } });
@@ -82,8 +123,8 @@ describe("App", () => {
       "true",
     );
     expect(screen.getByLabelText("Quality score: 83")).toBeInTheDocument();
-    expect(screen.getByLabelText("Risk: Low")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Original quality" })).toBeInTheDocument();
+    expect(screen.getByLabelText("High-suspicion matches: 0")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "File quality" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Candidate quality" })).not.toBeInTheDocument();
   });
 
@@ -116,6 +157,7 @@ describe("App", () => {
 
   it("supports arrow-key tab navigation", () => {
     render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Compare revisions" }));
     const overviewTab = screen.getByRole("tab", { name: "Overview" });
 
     overviewTab.focus();

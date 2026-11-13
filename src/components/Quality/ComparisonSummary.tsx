@@ -20,10 +20,14 @@ export function ComparisonSummary({ comparison }: ComparisonSummaryProps) {
       <div className={styles.headline}>
         <h3>Candidate vs. original</h3>
         <span className={styles.scoreDelta} data-direction={direction}>
-          Overall score {signed(comparison.scoreDelta)}
+          Score change:{" "}
+          {comparison.scoreDelta === 0
+            ? "0 points (unchanged)"
+            : `${signed(comparison.scoreDelta)} ${Math.abs(comparison.scoreDelta) === 1 ? "point" : "points"}`}
         </span>
       </div>
 
+      <p className={styles.noChange}>Category scores: Original → Candidate; change in points.</p>
       <ul className={styles.categoryDeltas}>
         {comparison.categoryDeltas.map((entry) => (
           <li key={entry.category}>

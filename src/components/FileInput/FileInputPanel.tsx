@@ -24,9 +24,15 @@ interface FileInputPanelProps {
   readonly slotLabel: string;
   readonly slotKey: "original" | "candidate";
   readonly loader: FileLoaderApi;
+  readonly singleMode?: boolean;
 }
 
-export function FileInputPanel({ slotLabel, slotKey, loader }: FileInputPanelProps) {
+export function FileInputPanel({
+  slotLabel,
+  slotKey,
+  loader,
+  singleMode = false,
+}: FileInputPanelProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [draftText, setDraftText] = useState("");
@@ -123,9 +129,11 @@ export function FileInputPanel({ slotLabel, slotKey, loader }: FileInputPanelPro
             {slotLabel}
           </h2>
           <p id={descriptionId} className={styles.panelDescription}>
-            {slotKey === "original"
-              ? "First file in the comparison"
-              : "Second file in the comparison"}
+            {singleMode
+              ? "Skill file to review"
+              : slotKey === "original"
+                ? "First file in the comparison"
+                : "Second file in the comparison"}
           </p>
         </div>
       </div>

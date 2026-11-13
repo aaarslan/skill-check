@@ -41,6 +41,7 @@ interface ResultsSectionProps {
   readonly ignoreWhitespace: boolean;
   readonly onIgnoreWhitespaceChange: (value: boolean) => void;
   readonly analyzing?: boolean;
+  readonly singleMode?: boolean;
 }
 
 export function ResultsSection({
@@ -49,8 +50,9 @@ export function ResultsSection({
   ignoreWhitespace,
   onIgnoreWhitespaceChange: setIgnoreWhitespace,
   analyzing = false,
+  singleMode = false,
 }: ResultsSectionProps) {
-  const [activeTab, setActiveTab] = useState<ResultTab>("overview");
+  const [activeTab, setActiveTab] = useState<ResultTab>(singleMode ? "quality" : "overview");
   const originalSlot = view.kind === "both" || view.kind === "original-only" ? view.original : null;
   const candidateSlot =
     view.kind === "both" || view.kind === "candidate-only" ? view.candidate : null;
@@ -62,13 +64,12 @@ export function ResultsSection({
     : singleSlot
       ? singleSlot.quality.score.toString()
       : "\u2014";
-  const highRiskCount = bothLoaded
-    ? countHighSuspicion(view.original.injection) + countHighSuspicion(view.candidate.injection)
+  const highSuspicionMatches = bothLoaded
+    ? `${countHighSuspicion(view.original.injection)} → ${countHighSuspicion(view.candidate.injection)}`
     : singleSlot
-      ? countHighSuspicion(singleSlot.injection)
-      : null;
-  const risk =
-    highRiskCount === null ? "\u2014" : highRiskCount > 0 ? `${highRiskCount} high` : "Low";
+      ? countHighSuspicion(singleSlot.injection).toString()
+      : "—";
+  const originalLabel = singleMode ? "File" : "Original";
   const changedSections = bothLoaded ? view.diff.addedCount + view.diff.removedCount : null;
   const totalTokens = bothLoaded
     ? Math.ceil((view.original.file.content.length + view.candidate.file.content.length) / 4)
@@ -77,12 +78,12 @@ export function ResultsSection({
       : null;
 
   useEffect(() => {
-    if (view.kind === "original-only" || view.kind === "candidate-only") {
+    if (singleMode || view.kind === "original-only" || view.kind === "candidate-only") {
       setActiveTab("quality");
     } else {
       setActiveTab("overview");
     }
-  }, [view.kind]);
+  }, [view.kind, singleMode]);
 
   const waitingState =
     view.kind === "original-only"
@@ -104,8 +105,12 @@ export function ResultsSection({
           };
 
   const tabs: readonly { id: ResultTab; label: string }[] = [
-    { id: "overview", label: "Overview" },
-    { id: "diff", label: "Diff" },
+    ...(!singleMode
+      ? ([
+          { id: "overview", label: "Overview" },
+          { id: "diff", label: "Diff" },
+        ] as const)
+      : []),
     { id: "quality", label: "Quality score" },
     { id: "injection", label: "Prompt injection" },
     { id: "spec", label: "Spec compliance" },
@@ -138,7 +143,11 @@ export function ResultsSection({
       {analyzing && <p role="status">Analyzing the latest edits…</p>}
       <div className={styles.metricGrid}>
         <Metric icon={<ChartBar size={24} />} label="Quality score" value={score} />
-        <Metric icon={<Shield size={24} />} label="Risk" value={risk} />
+        <Metric
+          icon={<Shield size={24} />}
+          label="High-suspicion matches"
+          value={highSuspicionMatches}
+        />
         <Metric
           icon={<ListBullets size={24} />}
           label="Changed lines"
@@ -150,6 +159,11 @@ export function ResultsSection({
           value={totalTokens === null ? "—" : totalTokens.toLocaleString()}
         />
       </div>
+
+      <p className={styles.sectionDisclaimer}>
+        {bothLoaded && "Original → Candidate. "}
+        High-suspicion matches are counted per file; zero is not a safety clearance.
+      </p>
 
       <div className={styles.tabs} role="tablist" aria-label="Analysis sections">
         {tabs.map((tab) => (
@@ -174,6 +188,7 @@ export function ResultsSection({
         id={`${activeTab}-panel`}
         className={styles.tabPanel}
         role="tabpanel"
+        tabIndex={0}
         aria-labelledby={`${activeTab}-tab`}
       >
         {!bothLoaded &&
@@ -208,7 +223,7 @@ export function ResultsSection({
                 </p>
                 <div className={styles.twoCol}>
                   {originalSlot && (
-                    <QualityPanel slotLabel="Original" report={originalSlot.quality} />
+                    <QualityPanel slotLabel={originalLabel} report={originalSlot.quality} />
                   )}
                   {candidateSlot && (
                     <QualityPanel slotLabel="Candidate" report={candidateSlot.quality} />
@@ -231,7 +246,7 @@ export function ResultsSection({
                 <div className={styles.twoCol}>
                   {originalSlot && (
                     <InjectionPanel
-                      slotLabel="Original"
+                      slotLabel={originalLabel}
                       findings={originalSlot.injection}
                       dismissed={workflow.injectionDismissals(originalSlot)}
                     />
@@ -259,7 +274,9 @@ export function ResultsSection({
                   skills.
                 </p>
                 <div className={styles.twoCol}>
-                  {originalSlot && <SpecPanel slotLabel="Original" findings={originalSlot.spec} />}
+                  {originalSlot && (
+                    <SpecPanel slotLabel={originalLabel} findings={originalSlot.spec} />
+                  )}
                   {candidateSlot && (
                     <SpecPanel slotLabel="Candidate" findings={candidateSlot.spec} />
                   )}

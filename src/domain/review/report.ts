@@ -178,7 +178,19 @@ export function sarifReport(
   };
 }
 
+export const REPORT_IMPORT_LIMITS = {
+  bytes: 8 * 1024 * 1024,
+  findings: 10_000,
+  documents: 100,
+  noteLength: 4000,
+} as const;
+
 export function importDecisions(jsonText: string, review: Review): Decisions {
+  if (
+    jsonText.length > REPORT_IMPORT_LIMITS.bytes ||
+    new TextEncoder().encode(jsonText).length > REPORT_IMPORT_LIMITS.bytes
+  )
+    throw new Error("Report imports must be at most 8 MiB.");
   let parsed: unknown;
   try {
     parsed = JSON.parse(jsonText);
@@ -195,6 +207,13 @@ export function importDecisions(jsonText: string, review: Review): Decisions {
   if (typeof candidate.schemaVersion !== "string" || !candidate.schemaVersion.startsWith("1."))
     throw new Error("Unsupported report schema; expected a 1.x Skillcheck report.");
   if (!Array.isArray(candidate.findings)) throw new Error("Report has no findings array.");
+  if (candidate.findings.length > REPORT_IMPORT_LIMITS.findings)
+    throw new Error("Report imports must have at most 10,000 findings.");
+  if (
+    Array.isArray(candidate.documents) &&
+    candidate.documents.length > REPORT_IMPORT_LIMITS.documents
+  )
+    throw new Error("Report imports must have at most 100 documents.");
   if (candidate.findings.length === 0) return {};
   // Finding ids are only path+kind+index, so a matching id does not prove the
   // finding is the same one. Require the imported report to carry the exact
@@ -243,6 +262,11 @@ export function importDecisions(jsonText: string, review: Review): Decisions {
     if (finding.line !== null && typeof finding.line !== "number") continue;
     const identity = `${finding.rule}\u0000${finding.line ?? ""}\u0000${finding.level}\u0000${finding.message}`;
     if (current.get(finding.id) !== identity) continue;
+    if (
+      typeof finding.decision?.note === "string" &&
+      finding.decision.note.length > REPORT_IMPORT_LIMITS.noteLength
+    )
+      throw new Error("Review notes must have at most 4,000 characters.");
     const status = finding.decision?.status;
     if (status !== "open" && status !== "reviewed" && status !== "dismissed") continue;
     decisions[finding.id] = {

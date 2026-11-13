@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vite-plus/test";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { App } from "./App.tsx";
 import { SAMPLE_ORIGINAL } from "./domain/review/samples.ts";
 
@@ -126,6 +126,17 @@ describe("App", () => {
 });
 
 describe("decision import feedback", () => {
+  it("rejects oversized reports before reading their contents", () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Try review example" }));
+    const text = vi.fn().mockResolvedValue("{}");
+    fireEvent.change(screen.getByLabelText("Import decisions from a JSON report"), {
+      target: { files: [{ name: "huge.json", size: 8 * 1024 * 1024 + 1, text }] },
+    });
+    expect(text).not.toHaveBeenCalled();
+    expect(screen.getByRole("alert")).toHaveTextContent(/8 MiB/u);
+  });
+
   it("reports a failed import instead of failing silently", async () => {
     render(<App />);
     fireEvent.click(screen.getByRole("button", { name: "Try review example" }));

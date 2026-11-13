@@ -1,7 +1,8 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ReviewDecisions } from "../hooks/useReviewDecisions.ts";
 import type { Review } from "../domain/review/analyze.ts";
 import {
+  REPORT_IMPORT_LIMITS,
   exportReview,
   importDecisions,
   markdownReport,
@@ -31,8 +32,16 @@ export function ReviewWorkflow({
 }) {
   const { decisions, update } = workflow;
   const [importStatus, setImportStatus] = useState<{ ok: boolean; message: string } | null>(null);
-  const reviewRef = useRef(review);
+  const reviewRef = useRef<Review | null>(review);
+  const importingRef = useRef(false);
+  const [importing, setImporting] = useState(false);
   reviewRef.current = review;
+  useEffect(() => {
+    reviewRef.current = review;
+    return () => {
+      reviewRef.current = null;
+    };
+  }, [review]);
   const findings = reviewFindings(review);
   return (
     <section className={styles.results} aria-label="Review workflow">
@@ -68,15 +77,27 @@ export function ReviewWorkflow({
           <input
             aria-label="Import decisions from a JSON report"
             type="file"
+            disabled={importing}
             accept="application/json,.json"
             onChange={(event) => {
               const file = event.target.files?.[0];
               event.target.value = "";
-              if (!file) return;
+              if (!file || importingRef.current) return;
+              if (file.size > REPORT_IMPORT_LIMITS.bytes) {
+                setImportStatus({ ok: false, message: "Report imports must be at most 8 MiB." });
+                return;
+              }
+              importingRef.current = true;
+              setImporting(true);
+              const importingReview = review;
               void file
                 .text()
                 .then((text) => {
                   const current = reviewRef.current;
+                  if (current !== importingReview)
+                    throw new Error(
+                      "The reviewed source changed. Import the matching report again.",
+                    );
                   const imported = importDecisions(text, current);
                   workflow.importAll(imported, current);
                   const count = Object.keys(imported).length;
@@ -90,6 +111,10 @@ export function ReviewWorkflow({
                     ok: false,
                     message: `Could not import "${file.name}": ${cause instanceof Error ? cause.message : "the file could not be read."}`,
                   });
+                })
+                .finally(() => {
+                  importingRef.current = false;
+                  setImporting(false);
                 });
             }}
           />
@@ -99,7 +124,8 @@ export function ReviewWorkflow({
       <p className={styles.sectionDisclaimer}>
         Rules {review.ruleVersion} · Report {review.schemaVersion}. JSON includes source text;
         Markdown includes findings and notes. Exports stay on your device until you share them.
-        Decisions do not change scores.
+        Decisions do not change scores. Imports support up to 8 MiB, 100 documents and 10,000
+        findings.
       </p>
       <details>
         <summary>{findings.length} findings to review</summary>

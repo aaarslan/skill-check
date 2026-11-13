@@ -15,70 +15,82 @@ interface WorkerResponse {
 
 interface PendingEntry {
   readonly resolve: (review: Review) => void;
-  readonly rejectRaw: (cause: Error) => void;
-  readonly fallback: () => Review;
-  timer: ReturnType<typeof setTimeout> | null;
+  readonly reject: (cause: Error) => void;
+  readonly cleanup: () => void;
 }
 
 const REQUEST_TIMEOUT_MS = 20_000;
+const FALLBACK_BYTES = 32 * 1024;
+const FALLBACK_LINES = 500;
 
 let worker: Worker | null = null;
-let workerBroken = false;
+let workerUnavailable = false;
 let nextRequestId = 1;
 const pending = new Map<number, PendingEntry>();
 
-function settleAllPending(cause: Error, runFallback: boolean) {
+function resetWorker(cause: Error) {
+  worker?.terminate();
+  worker = null;
   const entries = [...pending.values()];
   pending.clear();
   for (const entry of entries) {
-    if (entry.timer) clearTimeout(entry.timer);
-    if (!runFallback) {
-      entry.rejectRaw(cause);
-      continue;
-    }
-    try {
-      entry.resolve(entry.fallback());
-    } catch {
-      entry.rejectRaw(cause);
-    }
+    entry.cleanup();
+    entry.reject(cause);
   }
 }
 
-function resetWorker(cause: Error, runFallback: boolean, broken: boolean) {
-  worker?.terminate();
-  worker = null;
-  if (broken) workerBroken = true;
-  settleAllPending(cause, runFallback);
-}
-
 function getWorker(): Worker | null {
-  if (workerBroken || typeof Worker === "undefined") return null;
+  if (workerUnavailable || typeof Worker === "undefined") return null;
   if (!worker) {
     try {
-      worker = new Worker(new URL("../domain/review/analysisWorker.ts", import.meta.url), {
+      const active = new Worker(new URL("../domain/review/analysisWorker.ts", import.meta.url), {
         type: "module",
       });
-      worker.onmessage = (event: MessageEvent<WorkerResponse>) => {
+      worker = active;
+      active.onmessage = (event: MessageEvent<WorkerResponse>) => {
         const entry = pending.get(event.data.id);
         if (!entry) return;
         pending.delete(event.data.id);
-        if (entry.timer) clearTimeout(entry.timer);
+        entry.cleanup();
         if (event.data.review) entry.resolve(event.data.review);
-        else {
-          try {
-            entry.resolve(entry.fallback());
-          } catch {
-            entry.rejectRaw(new Error(event.data.error ?? "Analysis failed in worker."));
-          }
-        }
+        else entry.reject(new Error(event.data.error ?? "Analysis failed in worker."));
       };
-      worker.onerror = () => resetWorker(new Error("Analysis worker failed."), true, true);
+      active.onerror = () => {
+        if (worker === active)
+          resetWorker(new Error("Analysis worker failed. Change the input to retry."));
+      };
+      active.onmessageerror = () => {
+        if (worker === active)
+          resetWorker(
+            new Error("Analysis worker returned an unreadable result. Change the input to retry."),
+          );
+      };
     } catch {
-      workerBroken = true;
+      workerUnavailable = true;
       return null;
     }
   }
   return worker;
+}
+
+function analyzeWithoutWorker(
+  mode: ReviewMode,
+  sources: readonly ReviewSource[],
+  options: AnalyzeOptions,
+): Review {
+  let bytes = 0;
+  let lines = 0;
+  if (sources.length > 10)
+    throw new Error("Without Web Workers, review at most 10 files, 32 KiB and 500 lines total.");
+  for (const source of sources) {
+    if (source.content.length > FALLBACK_BYTES)
+      throw new Error("Without Web Workers, review at most 10 files, 32 KiB and 500 lines total.");
+    bytes += new TextEncoder().encode(source.content).length;
+    lines += source.content.split(/\r\n?|\n/u).length;
+    if (bytes > FALLBACK_BYTES || lines > FALLBACK_LINES)
+      throw new Error("Without Web Workers, review at most 10 files, 32 KiB and 500 lines total.");
+  }
+  return analyzeReview(mode, sources, options);
 }
 
 export function analyzeReviewAsync(
@@ -87,69 +99,81 @@ export function analyzeReviewAsync(
   options: AnalyzeOptions = {},
   signal?: AbortSignal,
 ): Promise<Review> {
+  if (signal?.aborted) return Promise.reject(new Error("Analysis aborted."));
   let active = getWorker();
-  if (!active) return Promise.resolve().then(() => analyzeReview(mode, sources, options));
+  if (!active)
+    return Promise.resolve().then(() => {
+      if (signal?.aborted) throw new Error("Analysis aborted.");
+      return analyzeWithoutWorker(mode, sources, options);
+    });
   if (pending.size > 0) {
-    // The single worker analyzes serially, so a queued stale snapshot only
-    // delays the current one. Restart it and drop superseded requests.
-    resetWorker(new Error("Analysis superseded by a newer request."), false, false);
+    resetWorker(new Error("Analysis superseded by a newer request."));
     active = getWorker();
-    if (!active) return Promise.resolve().then(() => analyzeReview(mode, sources, options));
+    if (!active) return Promise.reject(new Error("Analysis worker could not restart."));
   }
   const id = nextRequestId++;
-  return new Promise<Review>((resolvePromise, rejectPromise) => {
+  return new Promise<Review>((resolve, reject) => {
+    const abort = () => {
+      if (pending.has(id)) resetWorker(new Error("Analysis aborted."));
+    };
+    const timer = setTimeout(() => {
+      resetWorker(new Error("Analysis timed out. Reduce the input and apply changes to retry."));
+    }, REQUEST_TIMEOUT_MS);
     const entry: PendingEntry = {
-      resolve: resolvePromise,
-      rejectRaw: rejectPromise,
-      fallback: () => analyzeReview(mode, sources, options),
-      timer: setTimeout(() => {
-        resetWorker(new Error("Analysis timed out."), true, false);
-      }, REQUEST_TIMEOUT_MS),
+      resolve,
+      reject,
+      cleanup: () => {
+        clearTimeout(timer);
+        signal?.removeEventListener("abort", abort);
+      },
     };
     pending.set(id, entry);
-    signal?.addEventListener(
-      "abort",
-      () => {
-        if (pending.delete(id)) {
-          if (entry.timer) clearTimeout(entry.timer);
-          entry.rejectRaw(new Error("Analysis aborted."));
-        }
-      },
-      { once: true },
-    );
-    if (signal?.aborted) {
-      pending.delete(id);
-      if (entry.timer) clearTimeout(entry.timer);
-      entry.rejectRaw(new Error("Analysis aborted."));
-      return;
+    signal?.addEventListener("abort", abort, { once: true });
+    try {
+      active.postMessage({ id, mode, sources, options });
+    } catch {
+      resetWorker(new Error("Analysis could not be sent to the worker."));
     }
-    active.postMessage({ id, mode, sources, options });
   });
+}
+
+interface ReviewState {
+  readonly signature: string;
+  readonly review: Review | null;
+  readonly error: string | null;
 }
 
 export function useAsyncReview(
   mode: ReviewMode,
   sources: readonly ReviewSource[],
   options: AnalyzeOptions = {},
-): { review: Review | null; pending: boolean } {
+): { review: Review | null; pending: boolean; error: string | null } {
   const { packageRootName } = options;
   const stableOptions = useMemo<AnalyzeOptions>(
     () => (packageRootName ? { packageRootName } : {}),
     [packageRootName],
   );
   const signature = useMemo(
-    () =>
-      `${options.packageRootName ?? ""}\0${sources.map((source) => `${source.path}\0${source.content}`).join("\0")}`,
-    [sources, options.packageRootName],
+    () => JSON.stringify([mode, packageRootName, sources]),
+    [mode, sources, packageRootName],
   );
-  const syncFallback = useMemo(
-    () =>
-      typeof Worker === "undefined" && sources.length
-        ? analyzeReview(mode, sources, stableOptions)
-        : null,
-    [mode, sources, stableOptions],
-  );
-  const [state, setState] = useState<{ signature: string; review: Review } | null>(null);
+  const syncFallback = useMemo(() => {
+    if (typeof Worker !== "undefined" || !sources.length) return null;
+    try {
+      return {
+        review: analyzeWithoutWorker(mode, sources, stableOptions),
+        pending: false,
+        error: null,
+      };
+    } catch (cause) {
+      return {
+        review: null,
+        pending: false,
+        error: cause instanceof Error ? cause.message : "Analysis failed.",
+      };
+    }
+  }, [mode, sources, stableOptions]);
+  const [state, setState] = useState<ReviewState | null>(null);
   const completedSignatureRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -159,16 +183,18 @@ export function useAsyncReview(
     const controller = new AbortController();
     void analyzeReviewAsync(mode, sources, stableOptions, controller.signal)
       .then((review) => {
-        completedSignatureRef.current = signature;
-        if (!cancelled) setState({ signature, review });
-      })
-      .catch(() => {
         if (cancelled) return;
-        try {
-          const review = analyzeReview(mode, sources, stableOptions);
-          completedSignatureRef.current = signature;
-          setState({ signature, review });
-        } catch {}
+        completedSignatureRef.current = signature;
+        setState({ signature, review, error: null });
+      })
+      .catch((cause: unknown) => {
+        if (cancelled) return;
+        completedSignatureRef.current = signature;
+        setState({
+          signature,
+          review: null,
+          error: cause instanceof Error ? cause.message : "Analysis failed.",
+        });
       });
     return () => {
       cancelled = true;
@@ -176,10 +202,8 @@ export function useAsyncReview(
     };
   }, [mode, sources, signature, stableOptions]);
 
-  if (!sources.length) return { review: null, pending: false };
-  if (syncFallback) return { review: syncFallback, pending: false };
-  // Stale-while-revalidate: keep the last completed review on screen while the
-  // worker analyzes the new snapshot, so panels and tab state stay mounted.
-  // Callers surface `pending` so nobody exports the stale report unknowingly.
-  return { review: state?.review ?? null, pending: state?.signature !== signature };
+  if (!sources.length) return { review: null, pending: false, error: null };
+  if (syncFallback) return syncFallback;
+  if (state?.signature !== signature) return { review: null, pending: true, error: null };
+  return { review: state.review, pending: false, error: state.error };
 }

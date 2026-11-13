@@ -27,7 +27,8 @@ export function App() {
     }
   });
   const [mode, setMode] = useState<ReviewModeSelection>("single");
-  const { original, candidate, view, report, analyzing } = useSkillCheckAnalysis(ignoreWhitespace);
+  const { original, candidate, view, report, analyzing, error } =
+    useSkillCheckAnalysis(ignoreWhitespace);
   const workflow = useReviewDecisions(report);
   const originalSlot = view.kind === "both" || view.kind === "original-only" ? view.original : null;
 
@@ -123,6 +124,7 @@ export function App() {
             onIgnoreWhitespaceChange={setIgnoreWhitespace}
             analyzing={analyzing}
           />
+          {error && <p role="alert">{error}</p>}
           {report && <ReviewWorkflow review={report} workflow={workflow} />}
         </>
       )}

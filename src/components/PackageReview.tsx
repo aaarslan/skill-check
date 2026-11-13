@@ -1,4 +1,4 @@
-import { useDeferredValue, useState } from "react";
+import { useState } from "react";
 import { useAsyncReview } from "../hooks/useAsyncReview.ts";
 import { SAMPLE_PACKAGE } from "../domain/review/samples.ts";
 import { usePackageLoader } from "../hooks/usePackageLoader.ts";
@@ -8,8 +8,11 @@ import styles from "../App.module.css";
 
 export function PackageReview() {
   const loader = usePackageLoader();
-  const deferredSources = useDeferredValue(loader.sources);
-  const { review: report, pending } = useAsyncReview("package", deferredSources, {
+  const {
+    review: report,
+    pending,
+    error,
+  } = useAsyncReview("package", loader.sources, {
     packageRootName: loader.rootName || undefined,
   });
   const [draft, setDraft] = useState<{ path: string; content: string } | null>(null);
@@ -64,6 +67,7 @@ export function PackageReview() {
       {loader.loading && <p role="status">Reading selected text files…</p>}
       {pending && <p role="status">Analyzing…</p>}
       {loader.error && <p role="alert">{loader.error}</p>}
+      {error && <p role="alert">{error}</p>}
       {report && (
         <>
           <h3>{report.documents.length} files reviewed</h3>

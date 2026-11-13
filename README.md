@@ -134,8 +134,9 @@ positives, and misses. A positive prediction means medium or high suspicion;
 metrics are per document/category. False-positive rates use negative examples;
 miss rates use positive examples. Zero denominators are unavailable, not zero.
 
-This corpus was used during development. It is small, not held out, not independently
-adjudicated, and not representative of real-world prevalence. Its recorded mistakes
+The dev split was used during rule development; the held-out split evaluates the
+2026.11 pattern additions separately. Neither split is independently adjudicated
+or representative of real-world prevalence. Their recorded mistakes
 are intentionally visible. It does not measure skill effectiveness or establish
 safety. See `src/domain/calibration/fixtures.ts` and reproduce with `pnpm calibrate`.
 
